@@ -39,4 +39,3 @@ build-clang
 build-gcc
 Release
 Debug
-data
