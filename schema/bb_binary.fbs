@@ -1,0 +1,35 @@
+namespace bb_binary;
+
+
+table Detection {
+  idx:ulong;
+  localizerIdx :ulong;
+  x:ushort;
+  y:ushort;
+  zRotation:float;
+  yRotation:float;
+  xRotation:float;
+  radius:float;
+  decodedId:[float];
+  trackIdxs:[ulong];
+  vote:ushort;
+}
+
+// Corresponds to an image in the video
+table Frame {
+  id:ulong;
+  timestamp:ulong;
+  detections:[Detection];
+}
+
+// Corresponds to a video
+table FrameContainer {
+  id:ulong;
+  hdVideoFilename:string;
+  previewVideoFilename:string;
+  cam:ubyte;
+  worldCoordinatesTransform:[float];
+  from:ulong;
+  to:ulong;
+  frames:[Frame];
+}
