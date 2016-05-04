@@ -38,18 +38,22 @@ if ((DEFINED CPM_DIR) AND (DEFINED CPM_UNIQUE_ID) AND (DEFINED CPM_TARGET_NAME))
   include(${CPM_DIR}/CPM.cmake)
 endif()
 
-#if(NOT DEFINED CMAKECONFIG_PATH)
-#    CPM_AddModule("cmakeconfig"
-#        GIT_REPOSITORY "https://github.com/BioroboticsLab/cmakeconfig.git"
-#        GIT_TAG "master")
-#else()
-#    CPM_AddModule("cmakeconfig"
-#        SOURCE_DIR "${CMAKECONFIG_PATH}")
-#endif()
+if(NOT DEFINED CMAKECONFIG_PATH)
+    CPM_AddModule("cmakeconfig"
+        GIT_REPOSITORY "https://github.com/BioroboticsLab/cmakeconfig.git"
+        GIT_TAG "master")
+else()
+    CPM_AddModule("cmakeconfig"
+        SOURCE_DIR "${CMAKECONFIG_PATH}")
+endif()
+
+CPM_AddModule("cpm_fast_cpp_csv_parser"
+    GIT_REPOSITORY "https://github.com/BioroboticsLab/cpm_fast_cpp_csv_parser"
+    USE_EXISTING_VER TRUE)
 
 CPM_InitModule(${CPM_MODULE_NAME})
 
-#biorobotics_config()
+biorobotics_config()
 
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake/ ${CMAKE_MODULE_PATH})
 
@@ -59,7 +63,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake/ ${CMAKE_MODULE_PATH})
 find_package(FlatBuffers REQUIRED)
 
 build_flatbuffers(
-    "${CMAKE_CURRENT_SOURCE_DIR}/schema/bb_binary.fbs"
+    "${CMAKE_CURRENT_SOURCE_DIR}/schema/bb_binary_schema.fbs"
     ""
     "build_fbs"
     ""
