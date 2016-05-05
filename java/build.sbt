@@ -24,7 +24,10 @@ libraryDependencies ++= Seq(
 
   // logging
   "org.apache.logging.log4j" % "log4j-api" % "2.4.1",
-  "org.apache.logging.log4j" % "log4j-core" % "2.4.1"
+  "org.apache.logging.log4j" % "log4j-core" % "2.4.1",
+
+  // flatbuffers
+  "com.vlkan" % "flatbuffers" % "1.2.0-3f79e055"
 )
 
 // allows us to include spark packages
@@ -45,3 +48,16 @@ scalacOptions ++= List("-feature","-deprecation", "-unchecked", "-Xlint")
 testOptions in Test += Tests.Argument(TestFrameworks.ScalaTest, "-l",
   "org.scalatest.tags.Slow", "-u","target/junit-xml-reports", "-oD", "-eS")
 
+
+
+sourceGenerators in Compile += Def.task {
+  val schema = file("..") / "schema" / "bb_binary_schema.fbs"
+  val output_dir = (sourceManaged in Compile).value / "java"
+  println(schema)
+  val flatc_command = s"flatc --java -o $output_dir $schema"
+  println(flatc_command)
+  flatc_command !
+  val pathFinder = output_dir **  "*.java"
+  println(pathFinder.get)
+  pathFinder.get
+}.taskValue
