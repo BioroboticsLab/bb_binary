@@ -10,18 +10,45 @@ table Detection {
   yRotation:float;
   xRotation:float;
   radius:float;
-  decodedId:[float];
-  trackIdxs:[ulong];
+  decodedId:Id;
   vote:ushort;
 }
 
+table Id {
+    id:[float];
+}
+
+table FrameColumnwise {
+  idx:[ulong];            // unique sequential id of the tag
+  localizerIdx:[ushort];   // sequential id of the candidate per tag
+  gridIdx:[ushort];        // sequential id of the grid/decoding per candidate
+  xpos:[ushort];          // x coordinate of the grid center
+  ypos:[ushort];          // y coordinate of the grid center
+  zRotation:[float];      // rotation of the grid in x plane
+  yRotation:[float];      // rotation of the grid in y plane
+  xRotation:[float];      // rotation of the grid in z plane
+  lScore:[float];         // roi score (Localizer)
+  eScore:[ushort];         // ellipse score (EllipseFitter)
+  gScore:[float];         // grid score (GridFitter)
+  id:[ulong];             // decoded id
+}
+
+
 // Corresponds to an image in the video
-table Frame {
+table FrameRowwise {
   id:ulong;
   timestamp:ulong;
   detections:[Detection];
 }
 
+union Frame {
+    FrameColumnwise,
+    FrameRowwise
+}
+
+table FrameWrapper {
+    frame: Frame;
+}
 // Corresponds to a video
 table FrameContainer {
   id:ulong;
@@ -31,5 +58,5 @@ table FrameContainer {
   worldCoordinatesTransform:[float];
   from:ulong;
   to:ulong;
-  frames:[Frame];
+  frames:[FrameWrapper];
 }
