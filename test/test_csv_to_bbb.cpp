@@ -3,27 +3,21 @@
 #define CATCH_CONFIG_MAIN
 #include "catch.hpp"
 #include "bb_binary.h"
-#include "bb_binary_schema_generated.h"
+#include <capnp/message.h>
+#include <capnp/serialize-packed.h>
 
 using namespace bb_binary;
 
 TEST_CASE( "csv files can be converted to bbb (BeesBook Binary) and back", "[]" ) {
-    flatbuffers::FlatBufferBuilder builder;
+     ::capnp::MallocMessageBuilder message;
+
+    FrameColumnwise::Builder frame = message.initRoot<FrameColumnwise>();
     const auto & csv_fname = "data/Cam_0_20150920000000_185682.csv";
-    auto frame = frame_from_csv_file(builder, csv_fname);
-    builder.Finish(frame);
-    auto flatbuf_pointer = builder.GetBufferPointer();
-    auto flatbuf_size = builder.GetSize();
+    frame_from_csv_file(frame, csv_fname);
 
-    auto flatbuf = builder.ReleaseBufferPointer();
-    flatbuffers::Verifier verifier(flatbuf_pointer, flatbuf_size);
+    const auto frame_reader = frame.asReader();
 
-    // First, verify the buffers integrity (optional)
-    FrameColumnwise const * loaded_frame = flatbuffers::GetRoot<FrameColumnwise>(
-            reinterpret_cast<void*>(flatbuf_pointer));
-    REQUIRE(loaded_frame->Verify(verifier));
-
-    std::string csv_deserialized = frame_to_csv(loaded_frame);
+    std::string csv_deserialized = frame_to_csv(frame_reader);
     std::ofstream f("data/deserialized.csv");
     f << csv_deserialized;
 

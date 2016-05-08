@@ -60,36 +60,29 @@ set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake/ ${CMAKE_MODULE_PATH})
 
 # project dependecies
 find_package(Threads REQUIRED)
-# find_package(Boost COMPONENTS system filesystem program_options REQUIRED)
-find_package(FlatBuffers REQUIRED)
+find_package(Boost COMPONENTS filesystem program_options REQUIRED)
 find_package(LZ4 REQUIRED)
+find_package(CapnProto REQUIRED)
 
-build_flatbuffers(
-    "${CMAKE_CURRENT_SOURCE_DIR}/schema/bb_binary_schema.fbs"
-    ""
-    "build_fbs"
-    ""
-    "${CMAKE_CURRENT_SOURCE_DIR}/bb_binary/"
-    ""
-    "")
+add_definitions(${CAPNP_DEFINITIONS})
 
 include_directories(
     SYSTEM ${CATCH_INCLUDE_DIR}
     SYSTEM ${OpenCV_INCLUDE_DIRS}
     SYSTEM ${CUDA_INCLUDE_DIRS}
-    SYSTEM ${FLATBUFFERS_INCLUDE_DIRS}
     SYSTEM ${LZ4_INCLUDE_DIR}
+    SYSTEM (${CAPNP_INCLUDE_DIRS})
 )
-
 set(LIBS
     ${OpenCV_LIBS}
     ${Boost_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
     ${CUDA_LIBRARIES}
     ${LZ4_LIBS}
+    ${CAPNP_LIBRARIES}
     ${CPM_LIBRARIES}
 )
-add_subdirectory(bb_binary)
-
 set(TEST_LIBS ${LIBS} ${CPM_LIB_TARGET_NAME})
+
+add_subdirectory(bb_binary)
 add_subdirectory(test)

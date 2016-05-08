@@ -26,8 +26,8 @@ libraryDependencies ++= Seq(
   "org.apache.logging.log4j" % "log4j-api" % "2.4.1",
   "org.apache.logging.log4j" % "log4j-core" % "2.4.1",
 
-  // flatbuffers
-  "com.vlkan" % "flatbuffers" % "1.2.0-3f79e055"
+  // capnproto
+  "org.capnproto" % "runtime" % "0.1.1"
 )
 
 // allows us to include spark packages
@@ -51,12 +51,14 @@ testOptions in Test += Tests.Argument(TestFrameworks.ScalaTest, "-l",
 
 
 sourceGenerators in Compile += Def.task {
-  val schema = file("..") / "schema" / "bb_binary_schema.fbs"
+  val prefix = file("..") / "bb_binary"
+  val schema = file("..") / "bb_binary" / "bb_binary_schema.capnp"
   val output_dir = (sourceManaged in Compile).value / "java"
+  output_dir.mkdirs()
   println(schema)
-  val flatc_command = s"flatc --java -o $output_dir $schema"
-  println(flatc_command)
-  flatc_command !
+  val capnp_command = s"capnp compile -ojava:$output_dir  --src-prefix=$prefix $schema"
+  println(capnp_command)
+  capnp_command !
   val pathFinder = output_dir **  "*.java"
   println(pathFinder.get)
   pathFinder.get

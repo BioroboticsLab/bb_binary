@@ -1,10 +1,14 @@
 
 #include <fstream>
 #include <iostream>
-#include "bb_binary/bb_binary_schema_generated.h"
 #include <csv.h>
 #include <boost/filesystem.hpp>
 #include <sstream>
+
+#include "../bb_binary_schema.capnp.h"
+#include <capnp/message.h>
+#include <capnp/serialize-packed.h>
+#include <iostream>
 
 namespace bb_binary {
 
@@ -34,98 +38,78 @@ std::string id_to_string(unsigned int id, size_t nb_bits) {
     std::reverse(id_str.begin(), id_str.end());
     return id_str;
 }
-flatbuffers::Offset<FrameColumnwise> frame_from_csv_file(
-        flatbuffers::FlatBufferBuilder & builder,
+void frame_from_csv_file(
+        FrameColumnwise::Builder & frame,
         const std::string & fname) {
     std::ifstream inFile(fname);
     std::string fname_without_ext(fs::path(fname).stem().string());
-
     // counts the number of lines
     const size_t nb_detections = static_cast<size_t>(
             std::count(std::istreambuf_iterator<char>(inFile),
                        std::istreambuf_iterator<char>(), '\n'));
 
-    std::vector<unsigned short> tagIdx(nb_detections);          // unique sequential id of the tag
-    std::vector<unsigned short> candidateIdx(nb_detections);   // sequential id of the candidate per tag
-    std::vector<unsigned short> gridIdx(nb_detections);        // sequential id of the grid/decoding per candidate
-    std::vector<unsigned short> xpos(nb_detections);           // x coordinate of the grid center
-    std::vector<unsigned short> ypos(nb_detections);           // y coordinate of the grid center
-    std::vector<float> xRotation(nb_detections);               // rotation of the grid in x plane
-    std::vector<float> yRotation(nb_detections);               // rotation of the grid in y plane
-    std::vector<float> zRotation(nb_detections);               // rotation of the grid in z plane
-    std::vector<float> lScore(nb_detections);                  // roi s core
-    std::vector<unsigned short> eScore(nb_detections);         // ellipse score
-    std::vector<float> gScore(nb_detections);                  // grid score
-    std::vector<unsigned int> id(nb_detections);              // decoded id
+    auto tagIdx = frame.initTagIdx(nb_detections);       // unique sequential id of the tag
+    auto candidateIdx = frame.initCandidateIdx(nb_detections); // sequential id of the candidate per tag
+    auto gridIdx = frame.initGridIdx(nb_detections);           // sequential id of the grid/decoding per candidate
+    auto xpos = frame.initXpos(nb_detections);                 // x coordinate of the grid center
+    auto ypos =  frame.initYpos(nb_detections);                // y coordinate of the grid center
+    auto xRotation = frame.initXRotation(nb_detections);       // rotation of the grid in x plane
+    auto yRotation = frame.initYRotation(nb_detections);       // rotation of the grid in y plane
+    auto zRotation = frame.initZRotation(nb_detections);       // rotation of the grid in z plane
+    auto lScore = frame.initLScore(nb_detections);             // roi s core
+    auto eScore = frame.initEScore(nb_detections);             // ellipse score
+    auto gScore = frame.initGScore(nb_detections);             // grid score
+    auto id = frame.initId(nb_detections);                     // decoded id
 
-    std::string id_temporary;
     io::CSVReader<12> csv_reader(fname);
     size_t index = 0;
+
+    unsigned short tagIdx_tmp, candidateIdx_tmp, gridIdx_tmp, xpos_tmp, ypos_tmp;
+    float xRotation_tmp, yRotation_tmp, zRotation_tmp, lScore_tmp;
+    unsigned short eScore_tmp;
+    float gScore_tmp;
+    std::string id_tmp;
+
     while(csv_reader.read_row(
-            *(tagIdx.begin() + index),
-            *(candidateIdx.begin() + index),
-            *(gridIdx.begin() + index),
-            *(xpos.begin() + index),
-            *(ypos.begin() + index),
-            *(xRotation.begin() + index),
-            *(yRotation.begin() + index),
-            *(zRotation.begin() + index),
-            *(lScore.begin() + index),
-            *(eScore.begin() + index),
-            *(gScore.begin() + index),
-            id_temporary
+                tagIdx_tmp, candidateIdx_tmp, gridIdx_tmp, xpos_tmp, ypos_tmp,
+                xRotation_tmp, yRotation_tmp, zRotation_tmp, lScore_tmp, eScore_tmp,
+                gScore_tmp, id_tmp
     )) {
-        id.at(index) = parse_id(id_temporary);
+
+        tagIdx.set(index, tagIdx_tmp);
+        candidateIdx.set(index, candidateIdx_tmp);
+        gridIdx.set(index, gridIdx_tmp);
+        xpos.set(index, xpos_tmp);
+        ypos.set(index, ypos_tmp);
+        xRotation.set(index, xRotation_tmp);
+        yRotation.set(index, yRotation_tmp);
+        zRotation.set(index, zRotation_tmp);
+        lScore.set(index, lScore_tmp);
+        eScore.set(index, eScore_tmp);
+        gScore.set(index, gScore_tmp);
+        id.set(index, parse_id(id_tmp));
         index++;
     };
-
     assert(index == nb_detections);
-    auto off_fname = builder.CreateString(fname_without_ext);
-    auto off_tagIdx = builder.CreateVector(tagIdx);
-    auto off_candidateIdx  = builder.CreateVector(candidateIdx);
-    auto off_gridIdx = builder.CreateVector(gridIdx);
-    auto off_xpos = builder.CreateVector(xpos);
-    auto off_ypos = builder.CreateVector(ypos);
-    auto off_xRotation = builder.CreateVector(xRotation);
-    auto off_yRotation = builder.CreateVector(yRotation);
-    auto off_zRotation = builder.CreateVector(zRotation);
-    auto off_lScore = builder.CreateVector(lScore);
-    auto off_eScore = builder.CreateVector(eScore);
-    auto off_gScore = builder.CreateVector(gScore);
-    auto off_id = builder.CreateVector(id);
-
-    FrameColumnwiseBuilder frame(builder);
-    frame.add_image_name(off_fname);
-    frame.add_tagIdx(off_tagIdx);
-    frame.add_candidateIdx(off_candidateIdx);
-    frame.add_gridIdx(off_gridIdx);
-    frame.add_xpos(off_xpos);
-    frame.add_ypos(off_ypos);
-    frame.add_xRotation(off_xRotation);
-    frame.add_yRotation(off_yRotation);
-    frame.add_zRotation(off_zRotation);
-    frame.add_lScore(off_lScore);
-    frame.add_eScore(off_eScore);
-    frame.add_gScore(off_gScore);
-    frame.add_id(off_id);
-    return frame.Finish();
 }
 
-std::string frame_to_csv(const FrameColumnwise * frame) {
+
+std::string frame_to_csv(const FrameColumnwise::Reader & frame) {
     std::stringstream ss;
-    for(size_t i = 0; i < frame->candidateIdx()->Length(); i++) {
-        ss <<  frame->tagIdx()->Get(i) << ","
-           << frame->candidateIdx()->Get(i) << ","
-           << frame->gridIdx()->Get(i) << ","
-           << frame->xpos()->Get(i) << ","
-           << frame->ypos()->Get(i) << ","
-           << frame->xRotation()->Get(i) << ","
-           << frame->yRotation()->Get(i) << ","
-           << frame->zRotation()->Get(i) << ","
-           << frame->lScore()->Get(i) << ","
-           << frame->eScore()->Get(i) << ","
-           << frame->gScore()->Get(i) << ","
-           << id_to_string(frame->id()->Get(i), 12) << "\n";
+    for(size_t i = 0; i < frame.getCandidateIdx().size(); i++) {
+        std::cout << i << std::endl;
+        ss << frame.getTagIdx()[i] << ","
+           << frame.getCandidateIdx()[i] << ","
+           << frame.getGridIdx()[i] << ","
+           << frame.getXpos()[i] << ","
+           << frame.getYpos()[i] << ","
+           << frame.getXRotation()[i] << ","
+           << frame.getYRotation()[i] << ","
+           << frame.getZRotation()[i] << ","
+           << frame.getLScore()[i] << ","
+           << frame.getEScore()[i] << ","
+           << frame.getGScore()[i] << ","
+           << id_to_string(frame.getId()[i], 12) << "\n";
     }
     return ss.str();
 }

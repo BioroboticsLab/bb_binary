@@ -1,9 +1,10 @@
-#include "bb_binary_schema_generated.h"
+#include "bb_binary_schema.capnp.h"
 
 namespace bb_binary {
-    flatbuffers::Offset<FrameColumnwise> frame_from_csv_file(
-            flatbuffers::FlatBufferBuilder & builder,
+
+    void frame_from_csv_file(
+            FrameColumnwise::Builder & frame,
             const std::string & fname);
 
-    std::string frame_to_csv(const FrameColumnwise * frame);
+    std::string frame_to_csv(const FrameColumnwise::Reader & frame);
 }

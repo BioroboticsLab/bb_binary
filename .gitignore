@@ -1,5 +1,6 @@
 # Generated FBS headers
-*_generated.h
+*.capnp.h
+*.capnp.c++
 
 # Compiled Object files
 *.slo

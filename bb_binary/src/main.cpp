@@ -1,72 +1,32 @@
 # include <csv.h>
 #include <fstream>
 #include <iostream>
-#include "bb_binary/bb_binary_schema_generated.h"
+#include "bb_binary/bb_binary.h"
+#include "src/compress.h"
+
+#include <boost/test/unit_test.hpp>
+#include <boost/program_options.hpp>
+#include <boost/variant/variant.hpp>
+#include <boost/variant/get.hpp>
 
 using namespace bb_binary;
 
-flatbuffers::Offset<FrameColumnwise> read_csv_file(
-        flatbuffers::FlatBufferBuilder & builder,
-        const std::string & fname) {
-    std::ifstream inFile(fname);
-    const size_t nb_detections = static_cast<size_t>(std::count(std::istreambuf_iterator<char>(inFile),
-                                                          std::istreambuf_iterator<char>(), '\n')) + 1;
-
-    unsigned long * tagIdx;         // unique sequential id of the tag
-    unsigned short * candidateIdx;   // sequential id of the candidate per tag
-    unsigned short * gridIdx;        // sequential id of the grid/decoding per candidate
-    unsigned short * xpos;           // x coordinate of the grid center
-    unsigned short * ypos;           // y coordinate of the grid center
-    float * xRotation;    // rotation of the grid in x plane
-    float * yRotation;    // rotation of the grid in y plane
-    float * zRotation;    // rotation of the grid in z plane
-    float * lScore;       // roi score
-    unsigned short * eScore;       // ellipse score
-    float * gScore;       // grid score
-    unsigned long * id;             // decoded id
-
-    auto buf_tagIdx = builder.CreateUninitializedVector(nb_detections, &tagIdx);
-    auto buf_candidateIdx = builder.CreateUninitializedVector(nb_detections, &candidateIdx);
-    auto buf_gridIdx = builder.CreateUninitializedVector(nb_detections, &gridIdx);
-    auto buf_xpos = builder.CreateUninitializedVector(nb_detections, &xpos);
-    auto buf_ypos = builder.CreateUninitializedVector(nb_detections, &ypos);
-    auto buf_xRotation = builder.CreateUninitializedVector(nb_detections, &xRotation);
-    auto buf_yRotation = builder.CreateUninitializedVector(nb_detections, &yRotation);
-    auto buf_zRotation = builder.CreateUninitializedVector(nb_detections, &zRotation);
-    auto buf_lScore = builder.CreateUninitializedVector(nb_detections, &lScore);
-    auto buf_eScore = builder.CreateUninitializedVector(nb_detections, &eScore);
-    auto buf_gScore = builder.CreateUninitializedVector(nb_detections, &gScore);
-    auto buf_id = builder.CreateUninitializedVector(nb_detections, &id);
-
-    io::CSVReader<12> csv_reader(fname);
-    size_t index = 0;
-    while(csv_reader.read_row(
-                *(tagIdx + index),
-                *(candidateIdx + index),
-                *(gridIdx + index),
-                *(xpos + index),
-                *(ypos + index),
-                *(xRotation + index),
-                *(yRotation + index),
-                *(zRotation + index),
-                *(lScore + index),
-                *(eScore + index),
-                *(gScore + index),
-                *(id + index)
-    )) {
-        index++;
-    };
-    assert(index + 1== nb_detections);
-    std::cout << nb_detections << std::endl;
-    std::cout << index << std::endl;
-    return CreateFrameColumnwise(builder, buf_tagIdx, buf_candidateIdx, buf_gridIdx, buf_xpos, buf_ypos, buf_xRotation,
-                           buf_yRotation, buf_zRotation, buf_lScore, buf_eScore, buf_gScore, buf_id);
-}
-int main(){
+int main_old(int argc, char **argv) {
     flatbuffers::FlatBufferBuilder builder;
     std::vector<flatbuffers::Offset<FrameWrapper>> frames;
     std::vector<std::string> lines;
-    for (std::string line; std::getline(std::cin, line);) {
+    std::istream * istream = nullptr;
+    for(int i = 0; i < argc; i++) {
+        std::cout << argv[i] << std::endl;
+    }
+    std::ifstream input_file;
+    if (argc == 2) {
+        input_file.open(argv[1]);
+        istream = &input_file;
+    } else {
+        istream = &std::cin;
+    }
+    for (std::string line; std::getline(*istream, line);) {
         // remove trailing \n
         line.erase(std::remove(line.begin(), line.end(), '\n'), line.end());
         lines.emplace_back(std::move(line));
@@ -74,7 +34,7 @@ int main(){
 
     for (size_t i = 0; i < lines.size(); i++) {
         const auto & line = lines.at(i);
-        auto frame = read_csv_file(builder, line);
+        auto frame = frame_from_csv_file(builder, line);
         frames.push_back(CreateFrameWrapper(builder, Frame_FrameColumnwise, frame.Union()));
     }
     auto buf_frames = builder.CreateVector(frames);
@@ -85,6 +45,108 @@ int main(){
     builder.GetBufferPointer();
     builder.GetSize();
     FILE * f;
-    f = fopen("frames.bbb", "wb");
+    f = fopen("frames.bbb", "w");
     fwrite(builder.GetBufferPointer(), 1, builder.GetSize(), f);
+
+    f = fopen("frames.bbb.lz4", "w");
+    size_t bytes_out;
+    lz4_compress_and_write_to_file(reinterpret_cast<char*>(builder.GetBufferPointer()), builder.GetSize(), f, &bytes_out);
+    fclose(f);
+    std::cout << "bytes compressed: " << bytes_out << std::endl;
+    f = fopen("frames.bbb.lz4", "r");
+
+    void * decom_buf;
+    size_t decom_size;
+    try {
+        lz4_decompress_file(f, &decom_buf, &decom_size);
+    }
+    catch( const std::exception & ex ) {
+        std::cerr << ex.what() << std::endl;
+    }
+    fclose(f);
+    if (decom_size != builder.GetSize()) {
+        std::cout << "Buffer sizes not equal" << std::endl;
+    } else if (memcmp(builder.GetBufferPointer(), decom_buf, decom_size) == 0) {
+        std::cout << "Equal" << std::endl;
+        FILE * f_decom = fopen("frame_decom.bbb", "w");
+        fwrite(builder.GetBufferPointer(), 1, builder.GetSize(), f_decom);
+        fclose((f_decom));
+
+    } else {
+        std::cout << "Not Equal" << std::endl;
+    }
+}
+
+struct GenericOptions {
+    bool debug_;
+};
+
+struct CompressCSVCommand : public GenericOptions {
+    std::string pathfile;
+};
+
+struct BBBtoCSVCommand : public GenericOptions {
+    bool recurse_;
+    std::string perms_;
+    std::string path_;
+};
+
+typedef boost::variant<CompressCSVCommand, BBBtoCSVCommand> Command;
+
+Command ParseOptions(int argc, const char *argv[])
+{
+    namespace po = boost::program_options;
+
+    po::options_description global("Global options");
+    global.add_options()
+        ("debug", "Turn on debug output")
+        ("command", po::value<std::string>(), "command to execute")
+        ("subargs", po::value<std::vector<std::string> >(), "Arguments for command");
+
+    po::positional_options_description pos;
+    pos.add("command", 1).
+        add("subargs", -1);
+
+    po::variables_map vm;
+
+    po::parsed_options parsed = po::command_line_parser(argc, argv).
+        options(global).
+        positional(pos).
+        allow_unregistered().
+        run();
+
+    po::store(parsed, vm);
+
+    std::string cmd = vm["command"].as<std::string>();
+
+    if (cmd == "ls")
+    {
+        // ls command has the following options:
+        po::options_description ls_desc("ls options");
+        ls_desc.add_options()
+            ("hidden", "Show hidden files")
+            ("path", po::value<std::string>(), "Path to list");
+
+        // Collect all the unrecognized options from the first pass. This will include the
+        // (positional) command name, so we need to erase that.
+        std::vector<std::string> opts = po::collect_unrecognized(parsed.options, po::include_positional);
+        opts.erase(opts.begin());
+
+        // Parse again...
+        po::store(po::command_line_parser(opts).options(ls_desc).run(), vm);
+
+        LsCommand ls;
+        ls.debug_ = vm.count("debug");
+        ls.hidden_ = vm.count("hidden");
+        ls.path_ = vm["path"].as<std::string>();
+
+        return ls;
+    }
+    else if (cmd == "chmod")
+    {
+        // Something similar
+    }
+
+    // unrecognised command
+    throw po::invalid_option_value(cmd);
 }
