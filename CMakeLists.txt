@@ -7,8 +7,6 @@ set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
 project(bb_binary)
 
-option(USE_SYSTEM_CAFFE "USE_SYSTEM_CAFFE" OFF)
-
 #-----------------------------------------------------------------------
 # CPM configuration
 #-----------------------------------------------------------------------
@@ -51,6 +49,9 @@ CPM_AddModule("cpm_fast_cpp_csv_parser"
     GIT_REPOSITORY "https://github.com/BioroboticsLab/cpm_fast_cpp_csv_parser"
     USE_EXISTING_VER TRUE)
 
+CPM_AddModule("cpm_catch"
+    GIT_REPOSITORY "https://github.com/bcachet/cpm-catch")
+
 CPM_InitModule(${CPM_MODULE_NAME})
 
 biorobotics_config()
@@ -86,3 +87,6 @@ set(LIBS
     ${CPM_LIBRARIES}
 )
 add_subdirectory(bb_binary)
+
+set(TEST_LIBS ${LIBS} ${CPM_LIB_TARGET_NAME})
+add_subdirectory(test)
