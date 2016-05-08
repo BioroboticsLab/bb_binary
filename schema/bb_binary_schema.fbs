@@ -1,5 +1,7 @@
 namespace bb_binary;
 
+file_identifier "BEES";
+file_extension "bbb";
 
 table Detection {
   idx:ulong;
@@ -19,8 +21,9 @@ table Id {
 }
 
 table FrameColumnwise {
-  idx:[ulong];            // unique sequential id of the tag
-  localizerIdx:[ushort];   // sequential id of the candidate per tag
+  image_name:string;
+  tagIdx:[ushort];            // unique sequential id of the tag
+  candidateIdx:[ushort];   // sequential id of the candidate per tag
   gridIdx:[ushort];        // sequential id of the grid/decoding per candidate
   xpos:[ushort];          // x coordinate of the grid center
   ypos:[ushort];          // y coordinate of the grid center
@@ -30,7 +33,7 @@ table FrameColumnwise {
   lScore:[float];         // roi score (Localizer)
   eScore:[ushort];         // ellipse score (EllipseFitter)
   gScore:[float];         // grid score (GridFitter)
-  id:[ulong];             // decoded id
+  id:[uint];              // decoded id
 }
 
 
@@ -60,3 +63,5 @@ table FrameContainer {
   to:ulong;
   frames:[FrameWrapper];
 }
+
+root_type FrameContainer;
