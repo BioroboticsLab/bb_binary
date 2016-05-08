@@ -3,6 +3,7 @@
 #include <iostream>
 #include <lz4frame.h>
 #include <cstdio>
+#include <vector>
 
 #define BUF_SIZE (16*1024)
 #define LZ4_HEADER_SIZE 19
@@ -18,13 +19,13 @@ LZ4F_preferences_t get_lz4_preferences(const size_t content_size) {
 }
 
 int lz4_compress_and_write_to_file(
-		const char * buf_in, const size_t buf_in_size,
-		FILE * out, size_t * size_out)  {
+		const char * in, const size_t in_size,
+		FILE * out, size_t * bytes_written)  {
 	// adapted from  https://github.com/Cyan4973/lz4/blob/master/examples/frameCompress.c
 	LZ4F_errorCode_t r;
 	LZ4F_compressionContext_t ctx;
-    LZ4F_preferences_t lz4_preferences = get_lz4_preferences(buf_in_size);
-	const char * src = NULL;
+    LZ4F_preferences_t lz4_preferences = get_lz4_preferences(in_size);
+	char *src, *buf = NULL;
 	size_t size, n, k, count_in = 0, count_out, offset = 0, frame_size;
 
 	r = LZ4F_createCompressionContext(&ctx, LZ4F_VERSION);
@@ -36,8 +37,13 @@ int lz4_compress_and_write_to_file(
 
 	frame_size = LZ4F_compressBound(BUF_SIZE, &lz4_preferences);
 	size =  frame_size + LZ4_HEADER_SIZE + LZ4_FOOTER_SIZE;
+	buf = reinterpret_cast<char*>(malloc(size));
+	if (!buf) {
+		printf("Not enough memory");
+		goto cleanup;
+	}
 
-	n = offset = count_out = LZ4F_compressBegin(ctx, const_cast<char*>(buf_in), size, &lz4_preferences);
+	n = offset = count_out = LZ4F_compressBegin(ctx, buf, size, &lz4_preferences);
 	if (LZ4F_isError(n)) {
 		printf("Failed to start compression: error %zu", n);
 		goto cleanup;
@@ -46,17 +52,17 @@ int lz4_compress_and_write_to_file(
 	printf("Buffer size is %zu bytes, header size %zu bytes\n", size, n);
 
 	for (;;) {
-		src = buf_in + count_in;
-		if (count_in + BUF_SIZE > buf_in_size) {
-			k = buf_in_size - count_in;
-		} else {
+		if(count_in + BUF_SIZE < in_size) {
 			k = BUF_SIZE;
+		} else {
+			k = in_size - count_in;
 		}
+		src = const_cast<char*>(in + count_in);
 		if (k == 0)
 			break;
 		count_in += k;
 
-		n = LZ4F_compressUpdate(ctx, const_cast<char*>(buf_in + offset), size - offset, src, k, NULL);
+		n = LZ4F_compressUpdate(ctx, buf + offset, size - offset, src, k, NULL);
 		if (LZ4F_isError(n)) {
 			printf("Compression failed: error %zu", n);
 			goto cleanup;
@@ -65,7 +71,9 @@ int lz4_compress_and_write_to_file(
 		offset += n;
 		count_out += n;
 		if (size - offset < frame_size + LZ4_FOOTER_SIZE) {
-			k = fwrite(buf_in, 1, offset, out);
+			printf("Writing %zu bytes\n", offset);
+
+			k = fwrite(buf, 1, offset, out);
 			if (k < offset) {
 				if (ferror(out))
 					printf("Write failed");
@@ -78,7 +86,7 @@ int lz4_compress_and_write_to_file(
 		}
 	}
 
-	n = LZ4F_compressEnd(ctx, const_cast<char*>(buf_in + offset), size - offset, NULL);
+	n = LZ4F_compressEnd(ctx, buf + offset, size - offset, NULL);
 	if (LZ4F_isError(n)) {
 		printf("Failed to end compression: error %zu", n);
 		goto cleanup;
@@ -88,7 +96,7 @@ int lz4_compress_and_write_to_file(
 	count_out += n;
 	printf("Writing %zu bytes\n", offset);
 
-	k = fwrite(buf_in, 1, offset, out);
+	k = fwrite(buf, 1, offset, out);
 	if (k < offset) {
 		if (ferror(out))
 			printf("Write failed");
@@ -97,11 +105,12 @@ int lz4_compress_and_write_to_file(
 		goto cleanup;
 	}
 
-	*size_out = count_out;
+	*bytes_written = count_out;
 	r = 0;
  cleanup:
 	if (ctx)
 		LZ4F_freeCompressionContext(ctx);
+	free(buf);
 	return r;
 }
 
@@ -111,11 +120,11 @@ int lz4_decompress_file(FILE *in_file, void **buf_out, size_t * buf_out_size) {
     LZ4F_decompressOptions_t decOpt = {1, {0, 0, 0}};
     LZ4F_createDecompressionContext(&dctx, LZ4F_VERSION);
 
-    void * header_buf = malloc(LZ4_HEADER_SIZE);
+	std::vector<char> header_buf(LZ4_HEADER_SIZE);
     fseek(in_file, 0, SEEK_SET);
-    fread(header_buf, 1, LZ4_HEADER_SIZE, in_file);
+    fread(header_buf.data(), 1, LZ4_HEADER_SIZE, in_file);
     size_t header_size = LZ4_HEADER_SIZE;
-    size_t n = LZ4F_getFrameInfo(dctx, &frameInfo, header_buf, &header_size);
+    size_t n = LZ4F_getFrameInfo(dctx, &frameInfo, header_buf.data(), &header_size);
     if (LZ4F_isError(n)) {
         throw std::runtime_error("Failed to read frame info");
     }
@@ -126,8 +135,8 @@ int lz4_decompress_file(FILE *in_file, void **buf_out, size_t * buf_out_size) {
     *buf_out_size = frameInfo.contentSize + 1000;
     *buf_out = calloc(*buf_out_size, 1);
 
-    char * file_buf = static_cast<char*>(malloc(file_size));
-    fread(file_buf, 1, file_size, in_file);
+	std::vector<char> file_buf(file_size);
+    fread(file_buf.data(), 1, file_size, in_file);
     size_t source_size = file_size - header_size;
 
 	// Debug Output
@@ -137,13 +146,14 @@ int lz4_decompress_file(FILE *in_file, void **buf_out, size_t * buf_out_size) {
     std::cout << "Source size : " << source_size << std::endl;
 	std::cout << "Bufout: " << buf_out << std::endl;
 	std::cout << "Bufout size: " << *buf_out_size << std::endl;
-	std::cout << "Filebuf: " << file_buf + header_size << std::endl;
+	std::cout << "Filebuf: " << file_buf.data() + header_size << std::endl;
     n = LZ4F_decompress(dctx, *buf_out, buf_out_size,
-                       file_buf + header_size, &source_size, nullptr);
+                       file_buf.data() + header_size, &source_size, nullptr);
     if (LZ4F_isError(n)) {
         std::cout << LZ4F_getErrorName(n) << std::endl;
         throw std::runtime_error("Decompression Failed");
     }
+	LZ4F_freeDecompressionContext(dctx);
     return 0;
 }
 
