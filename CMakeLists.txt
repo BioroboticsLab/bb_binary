@@ -60,7 +60,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake/ ${CMAKE_MODULE_PATH})
 
 # project dependecies
 find_package(Threads REQUIRED)
-find_package(Boost COMPONENTS filesystem program_options REQUIRED)
+find_package(Boost COMPONENTS system filesystem program_options REQUIRED)
 find_package(LZ4 REQUIRED)
 find_package(CapnProto REQUIRED)
 
@@ -68,6 +68,7 @@ add_definitions(${CAPNP_DEFINITIONS})
 
 include_directories(
     SYSTEM ${CATCH_INCLUDE_DIR}
+    SYSTEM ${Boost_INCLUDE_DIRS}
     SYSTEM ${OpenCV_INCLUDE_DIRS}
     SYSTEM ${CUDA_INCLUDE_DIRS}
     SYSTEM ${LZ4_INCLUDE_DIR}
