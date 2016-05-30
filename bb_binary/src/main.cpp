@@ -133,8 +133,9 @@ struct ConvertCommand : public GenericCommand {
         capnp::MallocMessageBuilder message;
         FrameContainer::Builder container = message.initRoot<FrameContainer>();
 
-        auto frames_union = container.initFrames();
-        auto frames = frames_union.initColumnwise(this->files.size());
+        auto data_sourcess = container.initDataSources(1);
+        auto data_sources = data_sourcess.init(0, this->files.size());
+        auto frames = container.initFrames(this->files.size());
         for (size_t i = 0; i < this->files.size(); i++) {
             const auto & fname = this->files.at(i);
             auto frame = frames[i];

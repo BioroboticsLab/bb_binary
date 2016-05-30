@@ -3,8 +3,8 @@
 namespace bb_binary {
 
     void frame_from_csv_file(
-            FrameColumnwise::Builder & frame,
+            Frame::Builder & frame,
             const std::string & fname);
 
-    std::string frame_to_csv(const FrameColumnwise::Reader & frame);
+    std::string frame_to_csv(const Frame::Reader & frame);
 }

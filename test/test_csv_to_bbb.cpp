@@ -11,7 +11,7 @@ using namespace bb_binary;
 TEST_CASE( "csv files can be converted to bbb (BeesBook Binary) and back", "[]" ) {
      ::capnp::MallocMessageBuilder message;
 
-    FrameColumnwise::Builder frame = message.initRoot<FrameColumnwise>();
+    Frame::Builder frame = message.initRoot<Frame>();
     const auto & csv_fname = "data/Cam_0_20150920000000_185682.csv";
     frame_from_csv_file(frame, csv_fname);
 
