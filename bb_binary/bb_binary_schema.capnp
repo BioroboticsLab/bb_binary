@@ -51,7 +51,7 @@ enum Orientation {
 }
 
 struct Cam {
-    camId @0: UInt16;               # the cam id
+    cam @0: UInt16;                 # the cam number
     up @1: Orientation;             # where is up in the cam
     left @2: Orientation;           # where is left in the cam
     # TODO: other cam metadata
@@ -59,17 +59,20 @@ struct Cam {
 
 struct DataSource {
     filename @0 :Text;              # filename of the data source
-    videoPreviewFilename @1 :Text;  # if the data source is a video, this should be set to the filename of the preview video
-    videoStartFrame @2 :UInt32;     # the start frame of the video. Not set if the data source is no video
-    videoEndFrame @3 :UInt32;       # the end frame of the video. Not set if the data source is no video
+    videoPreviewFilename @1 :Text;  # (optional) filename of the preview video
+    videoStartFrame @2 :UInt32;     # the start frame of the video. Not set if the data source is not a video
+    videoEndFrame @3 :UInt32;       # the end frame of the video. Not set if the data source is not a video
     cam @4 :Cam;                    # the cam
 }
 
 # Corresponds to a video
 struct FrameContainer {
-  id @0 :UInt64;
+  id @0 :UInt64;                    # global unique id of the frame container
   dataSources @1: List(List(DataSource));
-  fromTimestamp @2 :UInt64;
-  toTimestamp @3 :UInt64;
-  frames @4 :List(Frame);
+                                    # if we operate on stitched images, we can have multiple data source for one frame.
+                                    # the outer list is over the different cameras and the inner list is over the different
+                                    # videos / images from the cams.
+  fromTimestamp @2 :UInt64;         # timestamp of the first frame
+  toTimestamp @3 :UInt64;           # timestamp of the last frame
+  frames @4 :List(Frame);           # frames are sorted by the timestamp in ascending order
 }
