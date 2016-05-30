@@ -15,9 +15,9 @@ struct DetectionCVP {
   yRotation @6 :Float32;        # rotation of the grid in y plane
   xRotation @7 :Float32;        # rotation of the grid in z plane
   lScore @8 :Float32;           # roi score (Localizer)
-  eScore @9 :UInt16;           # ellipse score (EllipseFitter)
+  eScore @9 :UInt16;            # ellipse score (EllipseFitter)
   gScore @10 :Float32;          # grid score (GridFitter)
-  decodedId @11 :UInt32;         # decoded id
+  decodedId @11 :UInt32;        # decoded id
 }
 
 struct DetectionDP {
