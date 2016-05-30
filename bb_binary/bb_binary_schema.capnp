@@ -33,11 +33,10 @@ struct DetectionDP {
 
 
 # Corresponds to an image in the video
-# TODO: How to handle stitching
 struct Frame {
   id @0 :UInt64;                # unique id of the frame
   timestamp @1 :UInt64;         # unix time stamp of the frame
-  detections : union {
+  detectionsUnion : union {
     detectionsCVP @2 :List(DetectionCVP);     # detections format of the old computer vision pipeline
     detectionsDP  @3 :List(DetectionDP);      # detections format of the new deeppipeline
   }
