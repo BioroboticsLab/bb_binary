@@ -60,4 +60,5 @@ def test_bbb_convert_detections_to_numpy():
     assert arr[0, 4] == detection.yRotation
     assert arr[0, 5] == detection.xRotation
     assert arr[0, 6] == detection.radius
-    assert (arr[0, 7:] == np.array([bit_value] * nb_bits)).all()
+    assert np.allclose(arr[0, 7:], np.array([bit_value / 255] * nb_bits),
+                       atol=0.5/255)

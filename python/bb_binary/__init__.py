@@ -35,7 +35,7 @@ def convert_detections_to_numpy(frame):
         arr[i, 4] = detection.yRotation
         arr[i, 5] = detection.xRotation
         arr[i, 6] = detection.radius
-        arr[i, 7:] = np.array(list(detection.decodedId))
+        arr[i, 7:] = np.array(list(detection.decodedId)) / 255
 
     return arr
 
