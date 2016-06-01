@@ -62,3 +62,11 @@ def test_bbb_convert_detections_to_numpy():
     assert arr[0, 6] == detection.radius
     assert np.allclose(arr[0, 7:], np.array([bit_value / 255] * nb_bits),
                        atol=0.5/255)
+
+
+def test_bbb_repo_save_json(tmpdir):
+    repo = bbb.Repository(str(tmpdir), 0, 10000)
+    assert tmpdir.join('bbb_repo.json').exists()
+
+    loaded_repo = bbb.Repository.load(str(tmpdir))
+    assert repo == loaded_repo

@@ -84,11 +84,31 @@ class Repository:
     The Repository class manages multiple bb_binary files. It creates a
     directory layout that enables fast access by the timestamp.
     """
-    def __init__(self, root_dir):
+    def __init__(self, root_dir, ts_start, ts_end, max_nb_files_in_dir=100):
         """
         Opens the repository at `root_dir`
         """
         self.root_dir = root_dir
+        self.ts_start = ts_start
+        self.ts_end = ts_end
+        self.max_nb_files_in_dir = max_nb_files_in_dir
+        if not os.path.exists(self.repo_json_fname()):
+            self._save_json()
+
+    def repo_json_fname(self):
+        return os.path.join(self.root_dir, 'bbb_repo.json')
+
+    def to_config(self):
+        return {
+            'root_dir': self.root_dir,
+            'ts_start': self.ts_start,
+            'ts_end': self.ts_end,
+            'max_nb_files_in_dir': self.max_nb_files_in_dir,
+        }
+
+    def _save_json(self):
+        with open(self.repo_json_fname(), 'w+') as f:
+            json.dump(self.to_config(), f)
 
     def add(frame_container: bbb.FrameContainer):
         """
@@ -110,8 +130,14 @@ class Repository:
         pass
 
     @staticmethod
-    def init(path, split_strategy):
-        """
-        Creates a new blank repository
-        """
-        pass
+    def load(root_dir):
+        config_fname = os.path.join(root_dir, 'bbb_repo.json')
+        assert config_fname, \
+            "Tries to load directory: {}, but file {} is missing".\
+            format(root_dir, config_fname)
+        with open(config_fname) as f:
+            config = json.load(f)
+        return Repository(**config)
+
+    def __eq__(self, other):
+        return self.to_config() == other.to_config()
