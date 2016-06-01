@@ -42,18 +42,10 @@ struct Frame {
   }
 }
 
-enum Orientation {
-    left @0;
-    bottom @1;
-    right @2;
-    top @3;
-}
 
 struct Cam {
-    cam @0: UInt16;                 # the cam number
-    up @1: Orientation;             # where is up in the cam
-    left @2: Orientation;           # where is left in the cam
-    # TODO: other cam metadata
+    cam @0 :UInt16;                 # the cam number
+    rotation @1 :Float32;           # the cam is rotated by this angle (in radians)
 }
 
 struct DataSource {
