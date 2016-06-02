@@ -1,7 +1,6 @@
 
 import bb_binary as bbb
-from bb_binary import FrameContainer, build_frame_container, \
-    parse_video_fname, parse_fname
+from bb_binary import build_frame_container, parse_video_fname
 
 import time
 import datetime
@@ -78,50 +77,49 @@ def test_bbb_repo_save_json(tmpdir):
     assert repo == loaded_repo
 
 
-
 def test_bbb_repo_directory_slices_for_ts(tmpdir):
-    repo = bbb.Repository(str(tmpdir), ts_begin=0, directory_depths=[2]*4,
+    repo = bbb.Repository(str(tmpdir), directory_breadths=[2]*4,
                           )
-    dirs = list(repo.directory_slices_for_ts(3000))
+    dirs = list(repo._directory_slices_for_ts(3000))
     assert dirs == ['00', '00', '30']
 
-    repo = bbb.Repository(str(tmpdir), ts_begin=1101, directory_depths=[3]*4)
+    repo = bbb.Repository(str(tmpdir), directory_breadths=[3]*4)
 
-    dirs = list(repo.directory_slices_for_ts(58000))
+    dirs = list(repo._directory_slices_for_ts(58000))
     assert dirs == ['000', '000', '058']
 
-    dirs = list(repo.directory_slices_for_ts(14358000))
+    dirs = list(repo._directory_slices_for_ts(14358000))
     assert dirs == ['000', '014', '358']
 
     now = int(time.time())
-    dirs = list(repo.directory_slices_for_ts(now))
+    dirs = list(repo._directory_slices_for_ts(now))
     now = str(now)
     assert dirs[-1] == now[-6:-3]
     assert dirs[-2] == now[-9:-6]
 
-    dirs = list(repo.directory_slices_for_ts(repo.max_ts - 1))
+    dirs = list(repo._directory_slices_for_ts(repo.max_ts - 1))
     assert dirs == ['999', '999', '999']
 
     with pytest.raises(AssertionError):
-        repo.directory_slices_for_ts(repo.max_ts)
+        repo._directory_slices_for_ts(repo.max_ts)
 
 
 def test_bbb_repo_get_ts_for_directory_slices(tmpdir):
-    repo = bbb.Repository(str(tmpdir), ts_begin=0, directory_depths=[2]*4)
+    repo = bbb.Repository(str(tmpdir), directory_breadths=[2]*4)
 
     dir_slices = ['00', '10', '01']
-    assert repo.get_timestamp_for_directory_slice(dir_slices) == 100100
+    assert repo._get_timestamp_for_directory_slice(dir_slices) == 100100
 
     # test inverse to directory_slices_for_ts
     ts = 3000
-    dir_slices = list(repo.directory_slices_for_ts(ts))
-    assert repo.get_timestamp_for_directory_slice(dir_slices)
+    dir_slices = list(repo._directory_slices_for_ts(ts))
+    assert repo._get_timestamp_for_directory_slice(dir_slices)
 
 
 def fill_repository(repo, begin_end_cam_id):
     for begin, end, cam_id in begin_end_cam_id:
         params = begin, end, cam_id, 'bbb'
-        fname = repo.get_file_name(*params)
+        fname = repo.get_filename(*params)
         os.makedirs(os.path.dirname(fname), exist_ok=True)
         with open(fname, 'w+') as f:
             f.write(str(begin))
@@ -142,10 +140,9 @@ def find_and_assert_begin(repo, timestamp, expect_begin, nb_files_found=1):
 
 
 def test_bbb_repo_find_single_file_per_timestamp(tmpdir):
-    repo = bbb.Repository(str(tmpdir), directory_depths=[3]*3 + [3])
+    repo = bbb.Repository(str(tmpdir), directory_breadths=[3]*3 + [3])
     span = 500
-    begin_end_cam_id = [(ts, ts + span, 0)
-                         for ts in range(0, 100000, span)]
+    begin_end_cam_id = [(ts, ts + span, 0) for ts in range(0, 100000, span)]
 
     fill_repository(repo, begin_end_cam_id)
 
@@ -161,7 +158,7 @@ def test_bbb_repo_find_single_file_per_timestamp(tmpdir):
 
 
 def test_bbb_repo_find_multiple_file_per_timestamp(tmpdir):
-    repo = bbb.Repository(str(tmpdir), directory_depths=[3]*3 + [3])
+    repo = bbb.Repository(str(tmpdir), directory_breadths=[3]*3 + [3])
     span = 500
     begin = 1000
     end = 100000
@@ -179,7 +176,7 @@ def test_bbb_repo_find_multiple_file_per_timestamp(tmpdir):
 
 
 def test_bbb_create_symlinks(tmpdir):
-    repo = bbb.Repository(str(tmpdir), directory_depths=[3]*3 + [3])
+    repo = bbb.Repository(str(tmpdir), directory_breadths=[3]*3 + [3])
     fname, symlinks = repo._create_file_and_symlinks(0, 2000, 0, 'bbb')
     with open(fname, 'w') as f:
         f.write("hello world!")
@@ -197,14 +194,14 @@ def test_bbb_create_symlinks(tmpdir):
 
 
 def test_bbb_repo_add_frame_container(tmpdir):
-    repo = bbb.Repository(str(tmpdir), directory_depths=[3]*3 + [3])
+    repo = bbb.Repository(str(tmpdir), directory_breadths=[3]*3 + [3])
     cam_id = 1
     fc = build_frame_container(1000, 5000, 1)
 
     repo.add(fc)
     fnames = repo.find(1000)
-    expected_fname = repo.get_file_name(fc.fromTimestamp,
-                                        fc.toTimestamp, cam_id, 'bbb')
+    expected_fname = repo.get_filename(fc.fromTimestamp,
+                                       fc.toTimestamp, cam_id, 'bbb')
     expected_fname = os.path.basename(expected_fname)
     assert os.path.basename(fnames[0]) == expected_fname
 
@@ -216,7 +213,7 @@ def test_bbb_repo_add_frame_container(tmpdir):
 
 
 def test_bbb_repo_open_frame_container(tmpdir):
-    repo = bbb.Repository(str(tmpdir), directory_depths=[3]*3 + [3])
+    repo = bbb.Repository(str(tmpdir), directory_breadths=[3]*3 + [3])
     cam_id = 1
     fc = build_frame_container(1000, 5000, cam_id)
 
@@ -239,3 +236,7 @@ def test_parse_video_fname():
     assert camIdx == 1
     assert begin_dt.year == 2016
     assert begin_dt.month == 5
+
+    fname = "Cam_1_20160501160208_0_TO_Cam_1_20160501160748_0.bb"
+    camIdx, begin, end = parse_video_fname(fname, format='timestamp')
+    assert begin == 20160501160208

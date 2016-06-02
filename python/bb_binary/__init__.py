@@ -161,9 +161,27 @@ def build_frame(
 def build_frame_container(from_ts, to_ts, cam_id,
                           data_source_fname=None,
                           video_preview_fname=None,
-                          video_first_frame=None,
-                          video_last_frame=None,
+                          video_first_frame_idx=None,
+                          video_last_frame_idx=None,
                           ):
+    """
+    Builds a FrameContainer
+
+    Args:
+        from_ts (int or float): Timestamp of the first frame
+        to_ts (int or float): Timestamp of the last frame
+        data_source_fname (Optional str): Filename of the data source.
+        video_preview_fname (Optional str): Filename of the preview video.
+        video_first_frame_idx (Optional str): Index of the frist frame used
+            from the video.
+        video_last_frame_idx (Optional str): Index of the last frame used
+            from the video.
+    """
+    fc = FrameContainer.new_message()
+    fc.fromTimestamp = from_ts
+    fc.toTimestamp = to_ts
+    data_sources = fc.init('dataSources', 1)
+
     fc = FrameContainer.new_message()
     fc.fromTimestamp = from_ts
     fc.toTimestamp = to_ts
@@ -175,14 +193,15 @@ def build_frame_container(from_ts, to_ts, cam_id,
         data_source.filename = data_source_fname
     if video_preview_fname is not None:
         data_source.videoPreviewFilename = video_preview_fname
-    if video_first_frame is not None:
-        data_source.videoFirstFrameIdx = video_first_frame
-    if video_last_frame is not None:
-        data_source.videoFirstFrameIdx = video_last_frame
+    if video_first_frame_idx is not None:
+        data_source.videoFirstFrameIdx = video_first_frame_idx
+    if video_last_frame_idx is not None:
+        data_source.videoFirstFrameIdx = video_last_frame_idx
     return fc
 
 
 def load_frame_container(fname):
+    """Loads frame container from this filename"""
     with open(fname, 'rb') as f:
         return FrameContainer.read(f)
 
@@ -192,83 +211,48 @@ class Repository:
     The Repository class manages multiple bb_binary files. It creates a
     directory layout that enables fast access by the timestamp.
     """
-    def __init__(self, root_dir, ts_begin=0, directory_depths=None):
+    def __init__(self, root_dir, directory_breadths=None):
         """
-        Opens the repository at `root_dir`
+        Creates a new repository at `root_dir`.
+
+        Args:
+            root_dir (str):  Path where the repository is created
+            directory_breadths (Optional list[int]): breaths of the directories
+                at the different level. For an int value of `n` there are
+                `10**n` possible branch-offs at this level.
+                Default value is `[3, 3, 3, 5]`.
         """
         self.root_dir = root_dir
-        self.ts_begin = ts_begin
-        if directory_depths is None:
-            directory_depths = [3, 3, 3, 5]
-        self.directory_depths = directory_depths
-        if not os.path.exists(self.repo_json_fname()):
+        if directory_breadths is None:
+            directory_breadths = [3, 3, 3, 5]
+        self.directory_breadths = directory_breadths
+        if not os.path.exists(self._repo_json_fname()):
             self._save_json()
-
-    def repo_json_fname(self):
-        return os.path.join(self.root_dir, 'bbb_repo.json')
 
     @property
     def max_ts(self):
-        return 10**sum(self.directory_depths) - 1
+        """Returns the maximum possible timestamp"""
+        return 10**sum(self.directory_breadths) - 1
 
     def can_contain_ts(self, timestamp):
-        return self.ts_begin <= timestamp < self.max_ts
+        """Can this repository contain the timestamp"""
+        return 0 <= timestamp < self.max_ts
 
-    def to_config(self):
-        return {
-            'root_dir': self.root_dir,
-            'ts_begin': self.ts_begin,
-            'directory_depths': self.directory_depths,
-        }
-
-    def _save_json(self):
-        with open(self.repo_json_fname(), 'w+') as f:
-            json.dump(self.to_config(), f)
-
-    def add(self, fc: FrameContainer):
+    def add(self, frame_container):
         """
         Adds the `frame_container` to the repository.
         """
-        begin = fc.fromTimestamp
-        end = fc.toTimestamp
-        cam_id = get_cam_id(fc)
+        begin = frame_container.fromTimestamp
+        end = frame_container.toTimestamp
+        cam_id = get_cam_id(frame_container)
         fname, _ = self._create_file_and_symlinks(begin, end, cam_id, 'bbb')
         with open(fname, 'w') as f:
-            fc.write(f)
+            frame_container.write(f)
 
-    def _create_file_and_symlinks(self, begin_ts, end_ts, cam_id,
-                                  extension=''):
-        fname = self.get_file_name(begin_ts, end_ts, cam_id, extension)
-        os.makedirs(os.path.dirname(fname), exist_ok=True)
-
-        if not os.path.exists(fname):
-            open(fname, 'a').close()
-
-        iter_ts = end_ts
-        symlinks = []
-        while self.spans_multiple_directories(begin_ts, iter_ts):
-            dir_slices = self.directory_slices_for_ts(iter_ts)
-            link_fname = self.get_file_name(begin_ts, end_ts, cam_id,
-                                            extension, dir_slices)
-            symlinks.append(link_fname)
-            link_dir = os.path.dirname(link_fname)
-            os.makedirs(link_dir, exist_ok=True)
-            rel_goal = os.path.relpath(fname, start=link_dir)
-            os.symlink(rel_goal, link_fname)
-
-            iter_dir_slices = self.one_directory_earlier(iter_ts)
-            iter_ts = self.get_timestamp_for_directory_slice(iter_dir_slices)
-
-        return fname, symlinks
-
-    def spans_multiple_directories(self, first_ts, end_ts):
-        return self.directory_slices_for_ts(first_ts) != \
-            self.directory_slices_for_ts(end_ts)
-
-    def open(self, timestamp, cam_id) -> bbb.FrameContainer:
+    def open(self, timestamp, cam_id):
         """
         Finds and load the FrameContainer that matches the timestamp and the
-        cam.
+        cam_id.
         """
         fnames = self.find(timestamp)
         for fname in fnames:
@@ -276,72 +260,60 @@ class Repository:
             if cam_id == cam_id:
                 return load_frame_container(fname)
 
-    def get_timestamp_for_directory_slice(self, dir_slices):
-        dir_slices = list(map(int, dir_slices))
-        ts = 0
-        for d, dir_number in zip(self._cumsum_directory_depths(), dir_slices):
-            ts += dir_number * 10 ** d
-        return ts
-
-    def one_directory_earlier(self, dir_slices):
-        if type(dir_slices) == int:
-            dir_slices = self.directory_slices_for_ts(dir_slices)
-        ts = self.get_timestamp_for_directory_slice(dir_slices)
-        ts -= 10**self._cumsum_directory_depths()[-1]
-        return self.directory_slices_for_ts(ts)
-
-    def find(self, ts) -> 'list(str)':
+    def find(self, ts):
         """
         Returns all files that includes detections to the given timestamp `ts`.
         """
-        dir_slices = self.directory_slices_for_ts(ts)
+        dir_slices = self._directory_slices_for_ts(ts)
         try:
-            fnames = self.all_files_in(*dir_slices)
+            fnames = self._all_files_in(*dir_slices)
         except FileNotFoundError:
             return []
-
         parts = [parse_fname(f) for f in fnames]
         begin_end_fnames = [(p[1], p[2], f) for p, f in zip(parts, fnames)]
-
         found_files = []
-
         for begin, end, fname in begin_end_fnames:
             if begin <= ts < end:
                 full_slices = dir_slices + [fname]
-                found_files.append(self.join_with_repo_dir(*full_slices))
+                found_files.append(self._join_with_repo_dir(*full_slices))
         return found_files
 
-    def get_file_name(self, begin_ts, end_ts, cam_id, extension='',
-                      dir_slices=None):
+    def get_filename(self, begin_ts, end_ts, cam_id, extension='',
+                     dir_slices=None):
         assert type(cam_id) is int
 
         if dir_slices is None:
-            dir_slices = self.directory_slices_for_ts(begin_ts)
+            dir_slices = self._directory_slices_for_ts(begin_ts)
         basename = get_video_fname(cam_id, begin_ts, end_ts)
         if extension != '':
             basename += '.' + extension
         full_slices = dir_slices + [basename]
-        return self.join_with_repo_dir(*full_slices)
+        return self._join_with_repo_dir(*full_slices)
 
-    def all_files_in(self, *paths):
-        def isfile_or_link(fname):
-            return os.path.isfile(fname) or os.path.islink(fname)
-        dirname = self.join_with_repo_dir(*paths)
-        return [f for f in os.listdir(dirname)
-                if isfile_or_link(os.path.join(dirname, f))]
+    def get_directory_for_ts(self, timestamp):
+        """Returns the directory where this timestamp would be stored."""
+        return self._join_with_repo_dir(
+            *self._directory_slices_for_ts(timestamp))
 
-    def join_with_repo_dir(self, *paths):
-        return os.path.join(self.root_dir, *paths)
+    @staticmethod
+    def load(directory):
+        """Load the repository from this directory."""
+        config_fname = os.path.join(directory, 'bbb_repo.json')
+        assert config_fname, \
+            "Tries to load directory: {}, but file {} is missing".\
+            format(directory, config_fname)
+        with open(config_fname) as f:
+            config = json.load(f)
+        return Repository(**config)
 
-    def _cumsum_directory_depths(self):
-        return [sum(self.directory_depths[i:-1])
-                for i in range(len(self.directory_depths))]
+    def __eq__(self, other):
+        return self._to_config() == other._to_config()
 
-    def get_directory(self, timestamp):
-        return self.join_with_repo_dir(
-            *self.directory_slices_for_ts(timestamp))
+    def _save_json(self):
+        with open(self._repo_json_fname(), 'w+') as f:
+            json.dump(self._to_config(), f)
 
-    def directory_slices_for_ts(self, timestamp):
+    def _directory_slices_for_ts(self, timestamp):
         assert self.can_contain_ts(timestamp)
 
         def convert_timestamp_to_path(ts, max_digets):
@@ -350,36 +322,77 @@ class Repository:
 
         def split_number(n):
             d = 0
-            depths = [sum(self.directory_depths[i:-1])
-                      for i in range(len(self.directory_depths))]
+            depths = [sum(self.directory_breadths[i:-1])
+                      for i in range(len(self.directory_breadths))]
             for d in depths:
                 n_d = int(math.floor(n / 10 ** d))
                 yield n_d
                 n -= n_d * 10 ** (d)
 
         slices = []
-        for t, d in zip(split_number(timestamp), self.directory_depths):
+        for t, d in zip(split_number(timestamp), self.directory_breadths):
             slices.append(convert_timestamp_to_path(t, d))
         return slices[:-1]
 
-    def common_directory_slices(self, first_ts, second_ts):
-        slices = []
-        for f, s in zip(self.directory_slices_for_ts(first_ts),
-                        self.directory_slices_for_ts(second_ts)):
-            if f == s:
-                slices.append(f)
-            else:
-                return slices
+    def _cumsum_directory_breadths(self):
+        return [sum(self.directory_breadths[i:-1])
+                for i in range(len(self.directory_breadths))]
 
-    @staticmethod
-    def load(root_dir):
-        config_fname = os.path.join(root_dir, 'bbb_repo.json')
-        assert config_fname, \
-            "Tries to load directory: {}, but file {} is missing".\
-            format(root_dir, config_fname)
-        with open(config_fname) as f:
-            config = json.load(f)
-        return Repository(**config)
+    def _join_with_repo_dir(self, *paths):
+        return os.path.join(self.root_dir, *paths)
 
-    def __eq__(self, other):
-        return self.to_config() == other.to_config()
+    def _all_files_in(self, *paths):
+        def isfile_or_link(fname):
+            return os.path.isfile(fname) or os.path.islink(fname)
+        dirname = self._join_with_repo_dir(*paths)
+        return [f for f in os.listdir(dirname)
+                if isfile_or_link(os.path.join(dirname, f))]
+
+    def _get_timestamp_for_directory_slice(self, dir_slices):
+        dir_slices = list(map(int, dir_slices))
+        ts = 0
+        for d, dir_number in zip(self._cumsum_directory_breadths(),
+                                 dir_slices):
+            ts += dir_number * 10 ** d
+        return ts
+
+    def _one_directory_earlier(self, dir_slices):
+        if type(dir_slices) == int:
+            dir_slices = self._directory_slices_for_ts(dir_slices)
+        ts = self._get_timestamp_for_directory_slice(dir_slices)
+        ts -= 10**self._cumsum_directory_breadths()[-1]
+        return self._directory_slices_for_ts(ts)
+
+    def _create_file_and_symlinks(self, begin_ts, end_ts, cam_id,
+                                  extension=''):
+        def spans_multiple_directories(first_ts, end_ts):
+            return self._directory_slices_for_ts(first_ts) != \
+                self._directory_slices_for_ts(end_ts)
+        fname = self.get_filename(begin_ts, end_ts, cam_id, extension)
+        os.makedirs(os.path.dirname(fname), exist_ok=True)
+        if not os.path.exists(fname):
+            open(fname, 'a').close()
+        iter_ts = end_ts
+        symlinks = []
+        while spans_multiple_directories(begin_ts, iter_ts):
+            dir_slices = self._directory_slices_for_ts(iter_ts)
+            link_fname = self.get_filename(begin_ts, end_ts, cam_id,
+                                           extension, dir_slices)
+            symlinks.append(link_fname)
+            link_dir = os.path.dirname(link_fname)
+            os.makedirs(link_dir, exist_ok=True)
+            rel_goal = os.path.relpath(fname, start=link_dir)
+            os.symlink(rel_goal, link_fname)
+            iter_dir_slices = self._one_directory_earlier(iter_ts)
+            iter_ts = self._get_timestamp_for_directory_slice(iter_dir_slices)
+        return fname, symlinks
+
+    def _repo_json_fname(self):
+        return os.path.join(self.root_dir, 'bbb_repo.json')
+
+    def _to_config(self):
+        return {
+            'root_dir': self.root_dir,
+            'directory_breadths': self.directory_breadths,
+        }
+
