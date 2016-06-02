@@ -49,17 +49,18 @@ struct Cam {
 }
 
 struct DataSource {
-    filename @0 :Text;              # filename of the data source
-    videoPreviewFilename @1 :Text;  # (optional) filename of the preview video
-    videoStartFrame @2 :UInt32;     # the start frame of the video. Not set if the data source is not a video
-    videoEndFrame @3 :UInt32;       # the end frame of the video. Not set if the data source is not a video
-    cam @4 :Cam;                    # the cam
+    filename @0 :Text;               # filename of the data source
+    videoPreviewFilename @1 :Text;   # (optional) filename of the preview video
+    videoFirstFrameIdx @2 :UInt32;   # the start frame of the video. Not set if the data source is not a video
+    videoLastFrameIdx @3 :UInt32;    # the end frame of the video. Not set if the data source is not a video
+    frameIds @4 :List(UInt64);       # the id's of the frames from this data source. Contains only one id if the data source is an image.
+    cam @5 :Cam;                     # the cam
 }
 
 # Corresponds to a video
 struct FrameContainer {
   id @0 :UInt64;                    # global unique id of the frame container
-  dataSources @1: List(List(DataSource));
+  dataSources @1: List(DataSource);
                                     # if we operate on stitched images, we can have multiple data source for one frame.
                                     # the outer list is over the different cameras and the inner list is over the different
                                     # videos / images from the cams.
