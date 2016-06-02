@@ -1,10 +1,13 @@
 
 import bb_binary as bbb
-from bb_binary import FrameContainer
+from bb_binary import FrameContainer, build_frame_container, \
+    parse_video_fname, parse_fname
+
 import time
 import numpy as np
 import pytest
 import os
+
 
 def test_bbb_is_loaded():
     frame = bbb.Frame.new_message()
@@ -114,9 +117,9 @@ def test_bbb_repo_get_ts_for_directory_slices(tmpdir):
     assert repo.get_timestamp_for_directory_slice(dir_slices)
 
 
-def fill_repository(repo, begin_end_cam_ids):
-    for begin, end, cam_ids in begin_end_cam_ids:
-        params = begin, end, cam_ids, 'bbb'
+def fill_repository(repo, begin_end_cam_id):
+    for begin, end, cam_id in begin_end_cam_id:
+        params = begin, end, cam_id, 'bbb'
         fname = repo.get_file_name(*params)
         os.makedirs(os.path.dirname(fname), exist_ok=True)
         with open(fname, 'w+') as f:
@@ -140,10 +143,10 @@ def find_and_assert_begin(repo, timestamp, expect_begin, nb_files_found=1):
 def test_bbb_repo_find_single_file_per_timestamp(tmpdir):
     repo = bbb.Repository(str(tmpdir), directory_depths=[3]*3 + [3])
     span = 500
-    begin_end_cam_ids = [(ts, ts + span, [0, 1])
+    begin_end_cam_id = [(ts, ts + span, 0)
                          for ts in range(0, 100000, span)]
 
-    fill_repository(repo, begin_end_cam_ids)
+    fill_repository(repo, begin_end_cam_id)
 
     find_and_assert_begin(repo, 0, expect_begin=0)
     find_and_assert_begin(repo, 50, expect_begin=0)
@@ -161,12 +164,12 @@ def test_bbb_repo_find_multiple_file_per_timestamp(tmpdir):
     span = 500
     begin = 1000
     end = 100000
-    begin_end_cam_ids = [(ts, ts + span, [0, 1])
+    begin_end_cam_id = [(ts, ts + span, 0)
+                        for ts in range(begin, end, span)]
+    begin_end_cam_id += [(ts, ts + span, 1)
                          for ts in range(begin, end, span)]
-    begin_end_cam_ids += [(ts, ts + span, [1, 2])
-                          for ts in range(begin, end, span)]
 
-    fill_repository(repo, begin_end_cam_ids)
+    fill_repository(repo, begin_end_cam_id)
 
     find_and_assert_begin(repo, 0, expect_begin=0, nb_files_found=0)
     find_and_assert_begin(repo, 1050, expect_begin=1000, nb_files_found=2)
@@ -176,35 +179,26 @@ def test_bbb_repo_find_multiple_file_per_timestamp(tmpdir):
 
 def test_bbb_create_symlinks(tmpdir):
     repo = bbb.Repository(str(tmpdir), directory_depths=[3]*3 + [3])
-    fname, symlinks = repo._create_file_and_symlinks(0, 2000, [0, 1], 'bbb')
+    fname, symlinks = repo._create_file_and_symlinks(0, 2000, 0, 'bbb')
     with open(fname, 'w') as f:
         f.write("hello world!")
     assert len(symlinks) == 2
     assert os.path.exists(symlinks[0])
-    print(symlinks)
     for symlink in symlinks:
         with open(symlink) as f:
             assert f.read() == "hello world!"
 
-    _, symlinks = repo._create_file_and_symlinks(1045, 4567, [0, 1], 'bbb')
+    _, symlinks = repo._create_file_and_symlinks(1045, 4567, 0, 'bbb')
     assert len(symlinks) == 3
 
-    _, symlinks = repo._create_file_and_symlinks(1045, 1999, [0, 1], 'bbb')
+    _, symlinks = repo._create_file_and_symlinks(1045, 1999, 0, 'bbb')
     assert len(symlinks) == 0
 
 
 def test_bbb_repo_add_frame_container(tmpdir):
     repo = bbb.Repository(str(tmpdir), directory_depths=[3]*3 + [3])
-    fc = FrameContainer.new_message()
-    fc.fromTimestamp = 1000
-    fc.toTimestamp = 5000
-    dss = fc.init('dataSources', 1)
-    data_source = dss.init(0, 1)
-    video = data_source[0]
-    cam = video.cam
-    cam_id = 0
-    cam.camId = cam_id
-    cam.rotation = 0
+    cam_id = 1
+    fc = build_frame_container(1000, 5000, 1)
 
     repo.add(fc)
     fnames = repo.find(1000)
@@ -217,12 +211,27 @@ def test_bbb_repo_add_frame_container(tmpdir):
     assert os.path.basename(fnames[0]) == expected_fname
 
     fnames = repo.find(2500)
-    print("files in repo: {}".format(repo.all_files_in(directory)))
     assert os.path.basename(fnames[0]) == expected_fname
+
+
+def test_bbb_repo_open_frame_container(tmpdir):
+    repo = bbb.Repository(str(tmpdir), directory_depths=[3]*3 + [3])
+    cam_id = 1
+    fc = build_frame_container(1000, 5000, cam_id)
+
+    repo.add(fc)
+    open_fc = repo.open(2000, 1)
+    assert fc.fromTimestamp == open_fc.fromTimestamp
+    assert fc.toTimestamp == open_fc.toTimestamp
 
 
 def test_parse_video_fname():
     fname = "Cam_1_20160501160208_958365_TO_Cam_1_20160501160748_811495.avi"
     camIdx, begin, end = parse_video_fname(fname)
+    assert camIdx == 1
+    assert begin.year == 2016
+
+    fname = "Cam_1_20160501160208_0_TO_Cam_1_20160501160748_0.bb"
+    camIdx, begin, end = parse_fname(fname)
     assert camIdx == 1
     assert begin.year == 2016

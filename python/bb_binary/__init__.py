@@ -51,13 +51,38 @@ def parse_video_fname(fname):
     return camIdx, begin, end
 
 
-def collect_cam_ids(fc: FrameContainer):
-    cam_ids = set()
-    for dss in fc.dataSources:
-        for source in dss:
-            cam_ids.add(source.cam.camId)
+def parse_fname(fname):
+    fname = os.path.basename(fname)
+    try:
+        return parse_video_fname(fname)
+    except Exception as e:
+        camIdx, dtime = parse_image_fname(fname)
+        return camIdx, dtime, dtime
 
-    return tuple(cam_ids)
+
+def get_fname(camIdx, ts):
+    if type(ts) in (int, float):
+        ts = datetime.datetime.fromtimestamp(ts, tz=get_timezone())
+    assert type(ts) == datetime.datetime
+    return ("Cam_{cam}_{year:02d}{month:02d}{day:02d}{hour:02d}"
+            "{minute:02d}{sec:02d}_{us}").format(
+                cam=camIdx,
+                year=ts.year,
+                month=ts.month,
+                day=ts.day,
+                hour=ts.hour,
+                minute=ts.minute,
+                sec=ts.second,
+                us=ts.microsecond,
+            )
+
+
+def get_video_fname(camIdx, begin, end):
+    return get_fname(camIdx, begin) + "_TO_" + get_fname(camIdx, end)
+
+
+def get_cam_id(fc: FrameContainer):
+    return fc.dataSources[0].cam.camId
 
 
 def convert_detections_to_numpy(frame):
@@ -124,6 +149,35 @@ def build_frame(
             decodedId[j] = int(round(255*bit))
 
 
+def build_frame_container(from_ts, to_ts, cam_id,
+                          data_source_fname=None,
+                          video_preview_fname=None,
+                          video_first_frame=None,
+                          video_last_frame=None,
+                          ):
+    fc = FrameContainer.new_message()
+    fc.fromTimestamp = from_ts
+    fc.toTimestamp = to_ts
+    data_sources = fc.init('dataSources', 1)
+    data_source = data_sources[0]
+    cam = data_source.cam
+    cam.camId = cam_id
+    if data_source_fname is not None:
+        data_source.filename = data_source_fname
+    if video_preview_fname is not None:
+        data_source.videoPreviewFilename = video_preview_fname
+    if video_first_frame is not None:
+        data_source.videoFirstFrameIdx = video_first_frame
+    if video_last_frame is not None:
+        data_source.videoFirstFrameIdx = video_last_frame
+    return fc
+
+
+def load_frame_container(fname):
+    with open(fname, 'rb') as f:
+        return FrameContainer.read(f)
+
+
 class Repository:
     """
     The Repository class manages multiple bb_binary files. It creates a
@@ -168,15 +222,14 @@ class Repository:
         """
         begin = fc.fromTimestamp
         end = fc.toTimestamp
-        cam_ids = collect_cam_ids(fc)
-        fname, _ = self._create_file_and_symlinks(begin, end, cam_ids, 'bbb')
-        print(fname)
+        cam_id = get_cam_id(fc)
+        fname, _ = self._create_file_and_symlinks(begin, end, cam_id, 'bbb')
         with open(fname, 'w') as f:
             fc.write(f)
 
-    def _create_file_and_symlinks(self, begin_ts, end_ts, cam_ids,
+    def _create_file_and_symlinks(self, begin_ts, end_ts, cam_id,
                                   extension=''):
-        fname = self.get_file_name(begin_ts, end_ts, cam_ids, extension)
+        fname = self.get_file_name(begin_ts, end_ts, cam_id, extension)
         os.makedirs(os.path.dirname(fname), exist_ok=True)
 
         if not os.path.exists(fname):
@@ -186,7 +239,7 @@ class Repository:
         symlinks = []
         while self.spans_multiple_directories(begin_ts, iter_ts):
             dir_slices = self.directory_slices_for_ts(iter_ts)
-            link_fname = self.get_file_name(begin_ts, end_ts, cam_ids,
+            link_fname = self.get_file_name(begin_ts, end_ts, cam_id,
                                             extension, dir_slices)
             symlinks.append(link_fname)
             link_dir = os.path.dirname(link_fname)
@@ -203,12 +256,16 @@ class Repository:
         return self.directory_slices_for_ts(first_ts) != \
             self.directory_slices_for_ts(end_ts)
 
-    def open(timestamp, cam) -> bbb.FrameContainer:
+    def open(self, timestamp, cam_id) -> bbb.FrameContainer:
         """
         Finds and load the FrameContainer that matches the timestamp and the
         cam.
         """
-        pass
+        fnames = self.find(timestamp)
+        for fname in fnames:
+            cam_id, _, _ = parse_fname(fname)
+            if cam_id == cam_id:
+                return load_frame_container(fname)
 
     def get_timestamp_for_directory_slice(self, dir_slices):
         dir_slices = list(map(int, dir_slices))
@@ -234,30 +291,25 @@ class Repository:
         except FileNotFoundError:
             return []
 
-        parts = [f.split('_') for f in fnames]
-        begin_end_fnames = [(int(p[0]), int(p[1]), f)
-                            for p, f in zip(parts, fnames)]
+        parts = [parse_fname(f) for f in fnames]
+        begin_end_fnames = [(p[1], p[2], f) for p, f in zip(parts, fnames)]
 
         found_files = []
+        dt_ts = datetime.datetime.fromtimestamp(ts, tz=get_timezone())
+
         for begin, end, fname in begin_end_fnames:
-            if begin <= ts < end:
+            if begin <= dt_ts < end:
                 full_slices = dir_slices + [fname]
                 found_files.append(self.join_with_repo_dir(*full_slices))
         return found_files
 
-    def get_file_name(self, begin_ts, end_ts, cam_ids, extension='',
+    def get_file_name(self, begin_ts, end_ts, cam_id, extension='',
                       dir_slices=None):
-        if type(cam_ids) is int:
-            cam_ids = [cam_ids]
+        assert type(cam_id) is int
 
         if dir_slices is None:
             dir_slices = self.directory_slices_for_ts(begin_ts)
-        cam_id_as_str = list(map(str, sorted(cam_ids)))
-        basename = "{begin}_{end}_cam_{cam_ids}".format(
-            cam_ids="".join(cam_id_as_str),
-            begin=begin_ts,
-            end=end_ts
-        )
+        basename = get_video_fname(cam_id, begin_ts, end_ts)
         if extension != '':
             basename += '.' + extension
         full_slices = dir_slices + [basename]
