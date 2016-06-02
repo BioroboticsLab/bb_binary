@@ -219,3 +219,10 @@ def test_bbb_repo_add_frame_container(tmpdir):
     fnames = repo.find(2500)
     print("files in repo: {}".format(repo.all_files_in(directory)))
     assert os.path.basename(fnames[0]) == expected_fname
+
+
+def test_parse_video_fname():
+    fname = "Cam_1_20160501160208_958365_TO_Cam_1_20160501160748_811495.avi"
+    camIdx, begin, end = parse_video_fname(fname)
+    assert camIdx == 1
+    assert begin.year == 2016

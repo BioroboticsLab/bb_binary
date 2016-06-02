@@ -18,6 +18,12 @@ Cam = bbb.Cam
 DetectionCVP = bbb.DetectionCVP
 DetectionDP = bbb.DetectionDP
 
+_TIMEZONE = timezone('Europe/Berlin')
+
+
+def get_timezone():
+    return _TIMEZONE
+
 
 def parse_image_fname(fname):
     name = fname.split('.')[0]
@@ -33,13 +39,16 @@ def parse_image_fname(fname):
     second = int(datetimeStr[12:14])
     us = int(usStr)
 
-    dt = datetime(year, month, day, hour, minute, second, us,
-                  timezone('Europe/Berlin'))
+    dt = datetime.datetime(year, month, day, hour, minute, second, us)
+    dt = get_timezone().localize(dt)
     return camIdx, dt
 
 
 def parse_video_fname(fname):
-    return (parse_image_fname(name) for name in fname.split('_TO_'))
+    begin_name, end_name = fname.split('_TO_')
+    (camIdx, begin) = parse_image_fname(begin_name)
+    (_, end) = parse_image_fname(end_name)
+    return camIdx, begin, end
 
 
 def collect_cam_ids(fc: FrameContainer):
