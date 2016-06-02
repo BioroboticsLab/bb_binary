@@ -19,6 +19,15 @@ DetectionCVP = bbb.DetectionCVP
 DetectionDP = bbb.DetectionDP
 
 
+def collect_cam_ids(fc: FrameContainer):
+    cam_ids = set()
+    for dss in fc.dataSources:
+        for source in dss:
+            cam_ids.add(source.cam.camId)
+
+    return tuple(cam_ids)
+
+
 def convert_detections_to_numpy(frame):
     """
     Returns the detections as a numpy array from the frame.
@@ -121,11 +130,17 @@ class Repository:
         with open(self.repo_json_fname(), 'w+') as f:
             json.dump(self.to_config(), f)
 
-    def add(frame_container: bbb.FrameContainer):
+    def add(self, fc: FrameContainer):
         """
         Adds the `frame_container` to the repository.
         """
-        pass
+        begin = fc.fromTimestamp
+        end = fc.toTimestamp
+        cam_ids = collect_cam_ids(fc)
+        fname, _ = self._create_file_and_symlinks(begin, end, cam_ids, 'bbb')
+        print(fname)
+        with open(fname, 'w') as f:
+            fc.write(f)
 
     def _create_file_and_symlinks(self, begin_ts, end_ts, cam_ids,
                                   extension=''):
@@ -139,7 +154,7 @@ class Repository:
         symlinks = []
         while self.spans_multiple_directories(begin_ts, iter_ts):
             dir_slices = self.directory_slices_for_ts(iter_ts)
-            link_fname = self.get_file_name(begin_ts, iter_ts, cam_ids,
+            link_fname = self.get_file_name(begin_ts, end_ts, cam_ids,
                                             extension, dir_slices)
             symlinks.append(link_fname)
             link_dir = os.path.dirname(link_fname)
@@ -150,7 +165,7 @@ class Repository:
             iter_dir_slices = self.one_directory_earlier(iter_ts)
             iter_ts = self.get_timestamp_for_directory_slice(iter_dir_slices)
 
-        return symlinks
+        return fname, symlinks
 
     def spans_multiple_directories(self, first_ts, end_ts):
         return self.directory_slices_for_ts(first_ts) != \
@@ -200,6 +215,9 @@ class Repository:
 
     def get_file_name(self, begin_ts, end_ts, cam_ids, extension='',
                       dir_slices=None):
+        if type(cam_ids) is int:
+            cam_ids = [cam_ids]
+
         if dir_slices is None:
             dir_slices = self.directory_slices_for_ts(begin_ts)
         cam_id_as_str = list(map(str, sorted(cam_ids)))
@@ -214,9 +232,11 @@ class Repository:
         return self.join_with_repo_dir(*full_slices)
 
     def all_files_in(self, *paths):
+        def isfile_or_link(fname):
+            return os.path.isfile(fname) or os.path.islink(fname)
         dirname = self.join_with_repo_dir(*paths)
         return [f for f in os.listdir(dirname)
-                if os.path.isfile(os.path.join(dirname, f))]
+                if isfile_or_link(os.path.join(dirname, f))]
 
     def join_with_repo_dir(self, *paths):
         return os.path.join(self.root_dir, *paths)
@@ -224,6 +244,10 @@ class Repository:
     def _cumsum_directory_depths(self):
         return [sum(self.directory_depths[i:-1])
                 for i in range(len(self.directory_depths))]
+
+    def get_directory(self, timestamp):
+        return self.join_with_repo_dir(
+            *self.directory_slices_for_ts(timestamp))
 
     def directory_slices_for_ts(self, timestamp):
         assert self.can_contain_ts(timestamp)

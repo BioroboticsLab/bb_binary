@@ -1,5 +1,6 @@
 
 import bb_binary as bbb
+from bb_binary import FrameContainer
 import time
 import numpy as np
 import pytest
@@ -175,22 +176,46 @@ def test_bbb_repo_find_multiple_file_per_timestamp(tmpdir):
 
 def test_bbb_create_symlinks(tmpdir):
     repo = bbb.Repository(str(tmpdir), directory_depths=[3]*3 + [3])
-    file_params = (0, 2000, [0, 1], 'bbb')
-    symlinks = repo._create_file_and_symlinks(*file_params)
-    fname = repo.get_file_name(*file_params)
+    fname, symlinks = repo._create_file_and_symlinks(0, 2000, [0, 1], 'bbb')
     with open(fname, 'w') as f:
         f.write("hello world!")
     assert len(symlinks) == 2
     assert os.path.exists(symlinks[0])
+    print(symlinks)
     for symlink in symlinks:
         with open(symlink) as f:
             assert f.read() == "hello world!"
 
-    file_params = (1045, 4567, [0, 1], 'bbb')
-    symlinks = repo._create_file_and_symlinks(*file_params)
+    _, symlinks = repo._create_file_and_symlinks(1045, 4567, [0, 1], 'bbb')
     assert len(symlinks) == 3
 
-    file_params = (1045, 1999, [0, 1], 'bbb')
-    symlinks = repo._create_file_and_symlinks(*file_params)
+    _, symlinks = repo._create_file_and_symlinks(1045, 1999, [0, 1], 'bbb')
     assert len(symlinks) == 0
 
+
+def test_bbb_repo_add_frame_container(tmpdir):
+    repo = bbb.Repository(str(tmpdir), directory_depths=[3]*3 + [3])
+    fc = FrameContainer.new_message()
+    fc.fromTimestamp = 1000
+    fc.toTimestamp = 5000
+    dss = fc.init('dataSources', 1)
+    data_source = dss.init(0, 1)
+    video = data_source[0]
+    cam = video.cam
+    cam_id = 0
+    cam.camId = cam_id
+    cam.rotation = 0
+
+    repo.add(fc)
+    fnames = repo.find(1000)
+    expected_fname = repo.get_file_name(fc.fromTimestamp,
+                                        fc.toTimestamp, cam_id, 'bbb')
+    expected_fname = os.path.basename(expected_fname)
+    assert os.path.basename(fnames[0]) == expected_fname
+    directory = repo.get_directory(2500)
+    fnames = repo.find(1500)
+    assert os.path.basename(fnames[0]) == expected_fname
+
+    fnames = repo.find(2500)
+    print("files in repo: {}".format(repo.all_files_in(directory)))
+    assert os.path.basename(fnames[0]) == expected_fname

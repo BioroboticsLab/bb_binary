@@ -44,7 +44,7 @@ struct Frame {
 
 
 struct Cam {
-    cam @0 :UInt16;                 # the cam number
+    camId @0 :UInt16;               # the cam number
     rotation @1 :Float32;           # the cam is rotated by this angle (in radians)
 }
 
