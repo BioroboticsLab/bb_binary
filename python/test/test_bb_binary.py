@@ -4,6 +4,7 @@ from bb_binary import FrameContainer, build_frame_container, \
     parse_video_fname, parse_fname
 
 import time
+import datetime
 import numpy as np
 import pytest
 import os
@@ -206,7 +207,7 @@ def test_bbb_repo_add_frame_container(tmpdir):
                                         fc.toTimestamp, cam_id, 'bbb')
     expected_fname = os.path.basename(expected_fname)
     assert os.path.basename(fnames[0]) == expected_fname
-    directory = repo.get_directory(2500)
+
     fnames = repo.find(1500)
     assert os.path.basename(fnames[0]) == expected_fname
 
@@ -227,11 +228,14 @@ def test_bbb_repo_open_frame_container(tmpdir):
 
 def test_parse_video_fname():
     fname = "Cam_1_20160501160208_958365_TO_Cam_1_20160501160748_811495.avi"
-    camIdx, begin, end = parse_video_fname(fname)
+    camIdx, begin, end = parse_video_fname(fname, format='readable')
+    begin_dt = datetime.datetime.fromtimestamp(begin)
     assert camIdx == 1
-    assert begin.year == 2016
+    assert begin_dt.year == 2016
 
     fname = "Cam_1_20160501160208_0_TO_Cam_1_20160501160748_0.bb"
-    camIdx, begin, end = parse_fname(fname)
+    camIdx, begin, end = parse_video_fname(fname, format='readable')
+    begin_dt = datetime.datetime.fromtimestamp(begin)
     assert camIdx == 1
-    assert begin.year == 2016
+    assert begin_dt.year == 2016
+    assert begin_dt.month == 5

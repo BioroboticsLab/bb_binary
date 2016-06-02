@@ -25,7 +25,7 @@ def get_timezone():
     return _TIMEZONE
 
 
-def parse_image_fname(fname):
+def parse_image_fname_readable(fname):
     name = fname.split('.')[0]
     _, camIdxStr, datetimeStr, usStr = name.split('_')
 
@@ -40,14 +40,29 @@ def parse_image_fname(fname):
     us = int(usStr)
 
     dt = datetime.datetime(year, month, day, hour, minute, second, us)
-    dt = get_timezone().localize(dt)
-    return camIdx, dt
+    ts = get_timezone().localize(dt).timestamp()
+    return camIdx, ts
 
 
-def parse_video_fname(fname):
+def parse_image_fname_ts(fname):
+    name = fname.split('.')[0]
+    _, camIdxStr, ts_str, micros_str = name.split('_')
+    ts = float("{}.{}".format(ts_str, micros_str))
+    return int(camIdxStr), ts
+
+
+def parse_image_fname(fname, format='timestamp'):
+    assert format in ['readable', 'timestamp']
+    if format == 'readable':
+        return parse_image_fname_readable(fname)
+    else:
+        return parse_image_fname_ts(fname)
+
+
+def parse_video_fname(fname, format='timestamp'):
     begin_name, end_name = fname.split('_TO_')
-    (camIdx, begin) = parse_image_fname(begin_name)
-    (_, end) = parse_image_fname(end_name)
+    (camIdx, begin) = parse_image_fname(begin_name, format)
+    (_, end) = parse_image_fname(end_name, format)
     return camIdx, begin, end
 
 
@@ -61,19 +76,13 @@ def parse_fname(fname):
 
 
 def get_fname(camIdx, ts):
-    if type(ts) in (int, float):
-        ts = datetime.datetime.fromtimestamp(ts, tz=get_timezone())
-    assert type(ts) == datetime.datetime
-    return ("Cam_{cam}_{year:02d}{month:02d}{day:02d}{hour:02d}"
-            "{minute:02d}{sec:02d}_{us}").format(
+    assert type(ts) in (int, float)
+    timestamp = str(ts).replace('.', '_')
+    if '_' not in timestamp:
+        timestamp += '_0'
+    return ("Cam_{cam}_{ts}").format(
                 cam=camIdx,
-                year=ts.year,
-                month=ts.month,
-                day=ts.day,
-                hour=ts.hour,
-                minute=ts.minute,
-                sec=ts.second,
-                us=ts.microsecond,
+                ts=timestamp,
             )
 
 
@@ -295,10 +304,9 @@ class Repository:
         begin_end_fnames = [(p[1], p[2], f) for p, f in zip(parts, fnames)]
 
         found_files = []
-        dt_ts = datetime.datetime.fromtimestamp(ts, tz=get_timezone())
 
         for begin, end, fname in begin_end_fnames:
-            if begin <= dt_ts < end:
+            if begin <= ts < end:
                 full_slices = dir_slices + [fname]
                 found_files.append(self.join_with_repo_dir(*full_slices))
         return found_files
