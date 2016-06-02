@@ -11,24 +11,29 @@ struct DetectionCVP {
   gridIdx @2 :UInt16;           # sequential id of the grid/decoding per candidate
   xpos @3 :UInt16;              # x coordinate of the grid center
   ypos @4 :UInt16;              # y coordinate of the grid center
-  zRotation @5 :Float32;        # rotation of the grid in x plane
-  yRotation @6 :Float32;        # rotation of the grid in y plane
-  xRotation @7 :Float32;        # rotation of the grid in z plane
-  lScore @8 :Float32;           # roi score (Localizer)
-  eScore @9 :UInt16;            # ellipse score (EllipseFitter)
-  gScore @10 :Float32;          # grid score (GridFitter)
-  decodedId @11 :UInt32;        # decoded id
+  xposHive @5 :UInt16;          # x coordinate of the grid center wrt. the hive
+  yposHive @6 :UInt16;          # y coordinate of the grid center wrt. the hive
+  zRotation @7 :Float32;        # rotation of the grid in x plane
+  yRotation @8 :Float32;        # rotation of the grid in y plane
+  xRotation @9 :Float32;        # rotation of the grid in z plane
+  lScore @10 :Float32;           # roi score (Localizer)
+  eScore @11 :UInt16;            # ellipse score (EllipseFitter)
+  gScore @12 :Float32;          # grid score (GridFitter)
+  decodedId @13 :UInt32;        # decoded id
 }
 
 struct DetectionDP {
   tagIdx @0 :UInt16;            # unique id of the tag
-  xpos @1 :UInt16;              # x coordinate of the grid center
-  ypos @2 :UInt16;              # y coordinate of the grid center
-  zRotation @3 :Float32;        # rotation of the grid in x plane
-  yRotation @4 :Float32;        # rotation of the grid in y plane
-  xRotation @5 :Float32;        # rotation of the grid in z plane
-  radius @6 :Float32;           # radius of the tag
-  decodedId @7 :List(UInt8);    # the decoded id, the bit probabilities are discretised to 0-255
+  xpos @1 :UInt16;         # x coordinate of the grid center wrt. the image
+  ypos @2 :UInt16;         # y coordinate of the grid center wrt. the image
+  xposHive @3 :UInt16;          # x coordinate of the grid center wrt. the hive
+  yposHive @4 :UInt16;          # y coordinate of the grid center wrt. the hive
+  zRotation @5 :Float32;        # rotation of the grid in x plane
+  yRotation @6 :Float32;        # rotation of the grid in y plane
+  xRotation @7 :Float32;        # rotation of the grid in z plane
+  radius @8 :Float32;           # radius of the tag
+  localizerSaliency @9 :UInt8;  # saliency of the localizer network
+  decodedId @10 :List(UInt8);    # the decoded id, the bit probabilities are discretised to 0-255
 }
 
 
