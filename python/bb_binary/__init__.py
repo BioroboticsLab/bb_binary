@@ -4,12 +4,12 @@ import os
 import numpy as np
 import json
 import math
-
+import datetime
+from pytz import timezone
 
 capnp.remove_import_hook()
-
-
 _dirname = os.path.dirname(os.path.realpath(__file__))
+
 bbb = capnp.load(os.path.join(_dirname, 'bb_binary_schema.capnp'))
 Frame = bbb.Frame
 FrameContainer = bbb.FrameContainer
@@ -17,6 +17,29 @@ DataSource = bbb.DataSource
 Cam = bbb.Cam
 DetectionCVP = bbb.DetectionCVP
 DetectionDP = bbb.DetectionDP
+
+
+def parse_image_fname(fname):
+    name = fname.split('.')[0]
+    _, camIdxStr, datetimeStr, usStr = name.split('_')
+
+    camIdx = int(camIdxStr)
+    year = int(datetimeStr[:4])
+    month = int(datetimeStr[4:6])
+    day = int(datetimeStr[6:8])
+
+    hour = int(datetimeStr[8:10])
+    minute = int(datetimeStr[10:12])
+    second = int(datetimeStr[12:14])
+    us = int(usStr)
+
+    dt = datetime(year, month, day, hour, minute, second, us,
+                  timezone('Europe/Berlin'))
+    return camIdx, dt
+
+
+def parse_video_fname(fname):
+    return (parse_image_fname(name) for name in fname.split('_TO_'))
 
 
 def collect_cam_ids(fc: FrameContainer):
