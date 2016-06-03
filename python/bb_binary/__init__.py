@@ -110,18 +110,23 @@ def convert_detections_to_numpy(frame):
         arr[i, 0] = detection.tagIdx
         arr[i, 1] = detection.xpos
         arr[i, 2] = detection.ypos
-        arr[i, 3] = detection.zRotation
-        arr[i, 4] = detection.yRotation
-        arr[i, 5] = detection.xRotation
-        arr[i, 6] = detection.radius
-        arr[i, 7:] = np.array(list(detection.decodedId)) / 255
+        arr[i, 3] = detection.xposHive
+        arr[i, 4] = detection.yposHive
+        arr[i, 5] = detection.hiveId
+        arr[i, 6] = detection.zRotation
+        arr[i, 7] = detection.yRotation
+        arr[i, 8] = detection.xRotation
+        arr[i, 9] = detection.radius
+        arr[i, 10:] = np.array(list(detection.decodedId)) / 255
 
     return arr
 
 
 def nb_parameters(detection):
     """Returns the number of parameter of the detections."""
-    return 7 + len(detection.decodedId)
+    return detection_dp_fields_before_ids + len(detection.decodedId)
+
+detection_dp_fields_before_ids = 10
 
 
 def build_frame(
@@ -149,12 +154,17 @@ def build_frame(
         detec_builder[i].tagIdx = int(detection[0])
         detec_builder[i].xpos = int(detection[1])
         detec_builder[i].ypos = int(detection[2])
-        detec_builder[i].zRotation = float(detection[3])
-        detec_builder[i].yRotation = float(detection[4])
-        detec_builder[i].xRotation = float(detection[5])
-        detec_builder[i].radius = float(detection[6])
-        decodedId = detec_builder[i].init('decodedId', len(detection) - 7)
-        for j, bit in enumerate(detections[i, 7:]):
+        detec_builder[i].xposHive = int(detection[3])
+        detec_builder[i].yposHive = int(detection[4])
+        detec_builder[i].hiveId = int(detection[5])
+        detec_builder[i].zRotation = float(detection[6])
+        detec_builder[i].yRotation = float(detection[7])
+        detec_builder[i].xRotation = float(detection[8])
+        detec_builder[i].radius = float(detection[9])
+
+        nb_ids = len(detection) - detection_dp_fields_before_ids
+        decodedId = detec_builder[i].init('decodedId', nb_ids)
+        for j, bit in enumerate(detections[i, detection_dp_fields_before_ids:]):
             decodedId[j] = int(round(255*bit))
 
 
@@ -395,4 +405,3 @@ class Repository:
             'root_dir': self.root_dir,
             'directory_breadths': self.directory_breadths,
         }
-
