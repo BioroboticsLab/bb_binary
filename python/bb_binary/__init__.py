@@ -26,7 +26,8 @@ def get_timezone():
 
 
 def parse_image_fname_readable(fname):
-    name = fname.split('.')[0]
+    basename = os.path.basename(fname)
+    name = basename.split('.')[0]
     _, camIdxStr, datetimeStr, usStr = name.split('_')
 
     camIdx = int(camIdxStr)
@@ -45,7 +46,8 @@ def parse_image_fname_readable(fname):
 
 
 def parse_image_fname_ts(fname):
-    name = fname.split('.')[0]
+    basename = os.path.basename(fname)
+    name = basename.split('.')[0]
     _, camIdxStr, ts_str, micros_str = name.split('_')
     ts = float("{}.{}".format(ts_str, micros_str))
     return int(camIdxStr), ts
