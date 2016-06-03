@@ -39,11 +39,12 @@ struct DetectionDP {
 
 # Corresponds to an image in the video
 struct Frame {
-  id @0 :UInt64;                # unique id of the frame
-  timestamp @1 :UInt64;         # unix time stamp of the frame
+  id @0 :UInt64;                # global unique id of the frame
+  dataSource @1:UInt32;       # the frame is from this data source
+  timestamp @2 :UInt64;         # unix time stamp of the frame
   detectionsUnion : union {
-    detectionsCVP @2 :List(DetectionCVP);     # detections format of the old computer vision pipeline
-    detectionsDP  @3 :List(DetectionDP);      # detections format of the new deeppipeline
+    detectionsCVP @3 :List(DetectionCVP);     # detections format of the old computer vision pipeline
+    detectionsDP  @4 :List(DetectionDP);      # detections format of the new deeppipeline
   }
 }
 
@@ -51,7 +52,13 @@ struct Frame {
 struct Cam {
     camId @0 :UInt16;                # the cam number
     hiveId @1 :UInt8;                # the id of the hive
-    rotation @1 :Float32;           # the cam is rotated by this angle (in radians)
+    transformationMatrix @2 :List(Float32);
+                                     # the transformation matrix from image coordinates to hive coordinates.
+                                     # The matrix is of dimension 4x4 and stored this way
+                                     #     1 | 2 | 3 | 4
+                                     #     5 | 6
+                                     #          ...
+                                     #             15| 16
 }
 
 struct DataSource {
@@ -65,11 +72,8 @@ struct DataSource {
 # Corresponds to a video
 struct FrameContainer {
   id @0 :UInt64;                    # global unique id of the frame container
-  dataSources @1: List(DataSource);
-                                    # if we operate on stitched images, we can have multiple data source for one frame.
-                                    # the outer list is over the different cameras and the inner list is over the different
-                                    # videos / images from the cams.
-  fromTimestamp @2 :UInt64;         # timestamp of the first frame
-  toTimestamp @3 :UInt64;           # timestamp of the last frame
+  dataSources @1:List(DataSource);  # list of data sources (videos / images)
+  fromTimestamp @2 :UInt64;         # unix timestamp of the first frame
+  toTimestamp @3 :UInt64;           # unix timestamp of the last frame
   frames @4 :List(Frame);           # frames are sorted by the timestamp in ascending order
 }
