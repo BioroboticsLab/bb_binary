@@ -249,3 +249,34 @@ def test_parse_video_fname():
     fname = "Cam_1_20160501160208_0_TO_Cam_1_20160501160748_0.bb"
     camIdx, begin, end = parse_video_fname(fname, format='timestamp')
     assert begin == 20160501160208
+
+
+@pytest.fixture(scope='module')
+def example_experiment_repo(request):
+    tmpdir = tempfile.mkdtemp(prefix=os.path.dirname(__file__))
+    repo = Repository(tmpdir)
+    experiment_duration = 6*7*24*3600
+    one_video = int(1024 / 3)
+    begin = int(time.time())
+    end = begin + experiment_duration
+
+    begin_end_cam_id = []
+    for cam_id in range(4):
+        begin_end_cam_id.extend([(ts, ts + one_video, cam_id)
+                                 for ts in range(begin, end, one_video)])
+    fill_repository(repo, begin_end_cam_id)
+
+    def fin():
+        shutil.rmtree(tmpdir)
+
+    request.addfinalizer(fin)
+    return repo, begin, end
+
+@pytest.mark.slow
+def test_benchmark_find(benchmark, example_experiment_repo):
+    repo, begin, end = example_experiment_repo
+
+    def find():
+        ts = random.randint(begin, end)
+        repo.find(ts)
+    benchmark(find)
