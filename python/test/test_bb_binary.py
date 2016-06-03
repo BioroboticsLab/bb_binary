@@ -1,6 +1,6 @@
 
 from bb_binary import build_frame_container, parse_video_fname, Frame, \
-    Repository, convert_detections_to_numpy, build_frame
+    Repository, convert_detections_to_numpy, build_frame, nb_parameters
 
 import time
 import datetime
@@ -84,42 +84,42 @@ def test_bbb_repo_save_json(tmpdir):
 
 
 def test_bbb_repo_directory_slices_for_ts(tmpdir):
-    repo = Repository(str(tmpdir), directory_breadths=[2]*4,
-                          )
-    dirs = list(repo._directory_slices_for_ts(3000))
-    assert dirs == ['00', '00', '30']
+    repo = Repository(str(tmpdir), directory_breadths=[2]*4)
+    path = repo._path_for_ts(3000)
+    assert path == '00/00/30'
 
     repo = Repository(str(tmpdir), directory_breadths=[3]*4)
 
-    dirs = list(repo._directory_slices_for_ts(58000))
-    assert dirs == ['000', '000', '058']
+    path = repo._path_for_ts(58000)
+    assert path == '000/000/058'
 
-    dirs = list(repo._directory_slices_for_ts(14358000))
-    assert dirs == ['000', '014', '358']
+    path = repo._path_for_ts(14358000)
+    assert path == '000/014/358'
 
     now = int(time.time())
-    dirs = list(repo._directory_slices_for_ts(now))
+    path = repo._path_for_ts(now)
     now = str(now)
-    assert dirs[-1] == now[-6:-3]
-    assert dirs[-2] == now[-9:-6]
+    path = path.split(os.path.sep)
+    assert path[-1] == now[-6:-3]
+    assert path[-2] == now[-9:-6]
 
-    dirs = list(repo._directory_slices_for_ts(repo.max_ts - 1))
-    assert dirs == ['999', '999', '999']
+    path = repo._path_for_ts(repo.max_ts - 1)
+    assert path == '999/999/999'
 
     with pytest.raises(AssertionError):
-        repo._directory_slices_for_ts(repo.max_ts)
+        repo._path_for_ts(repo.max_ts)
 
 
 def test_bbb_repo_get_ts_for_directory_slices(tmpdir):
     repo = Repository(str(tmpdir), directory_breadths=[2]*4)
 
-    dir_slices = ['00', '10', '01']
-    assert repo._get_timestamp_for_directory_slice(dir_slices) == 100100
+    path = '00/10/01'
+    assert repo._get_timestamp_from_path(path) == 100100
 
     # test inverse to directory_slices_for_ts
     ts = 3000
-    dir_slices = list(repo._directory_slices_for_ts(ts))
-    assert repo._get_timestamp_for_directory_slice(dir_slices)
+    path = repo._path_for_ts(ts)
+    assert repo._get_timestamp_from_path(path) == ts
 
 
 def fill_repository(repo, begin_end_cam_id):
@@ -289,7 +289,6 @@ def test_benchmark_add(benchmark, example_experiment_repo):
     cam_id = 0
     nb_bits = 12
     frame_container = build_frame_container(ts, ts + duration, cam_id)
-                                            )
     frames = frame_container.init('frames', 1024)
     frame_ts = ts
     for frame in frames:

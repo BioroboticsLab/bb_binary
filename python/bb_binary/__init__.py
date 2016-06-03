@@ -277,9 +277,9 @@ class Repository:
         """
         Returns all files that includes detections to the given timestamp `ts`.
         """
-        dir_slices = self._directory_slices_for_ts(ts)
+        path = self._path_for_ts(ts)
         try:
-            fnames = self._all_files_in(*dir_slices)
+            fnames = self._all_files_in(path)
         except FileNotFoundError:
             return []
         parts = [parse_fname(f) for f in fnames]
@@ -287,14 +287,13 @@ class Repository:
         found_files = []
         for begin, end, fname in begin_end_fnames:
             if begin <= ts < end:
-                full_slices = dir_slices + [fname]
-                found_files.append(self._join_with_repo_dir(*full_slices))
+                found_files.append(self._join_with_repo_dir(path, fname))
         return found_files
 
     def get_directory_for_ts(self, timestamp):
         """Returns the directory where this timestamp would be stored."""
         return self._join_with_repo_dir(
-            *self._directory_slices_for_ts(timestamp))
+            *self._path_for_ts(timestamp))
 
     @staticmethod
     def load(directory):
@@ -314,7 +313,7 @@ class Repository:
         with open(self._repo_json_fname(), 'w+') as f:
             json.dump(self._to_config(), f)
 
-    def _directory_slices_for_ts(self, timestamp):
+    def _path_for_ts(self, timestamp):
         assert self.can_contain_ts(timestamp)
 
         def convert_timestamp_to_path(ts, max_digets):
@@ -330,10 +329,10 @@ class Repository:
                 yield n_d
                 n -= n_d * 10 ** (d)
 
-        slices = []
+        path_pieces = []
         for t, d in zip(split_number(timestamp), self.directory_breadths):
-            slices.append(convert_timestamp_to_path(t, d))
-        return slices[:-1]
+            path_pieces.append(convert_timestamp_to_path(t, d))
+        return os.path.join(*path_pieces[:-1])
 
     def _cumsum_directory_breadths(self):
         return [sum(self.directory_breadths[i:-1])
@@ -349,26 +348,26 @@ class Repository:
         return [f for f in os.listdir(dirname)
                 if isfile_or_link(os.path.join(dirname, f))]
 
-    def _get_timestamp_for_directory_slice(self, dir_slices):
-        dir_slices = list(map(int, dir_slices))
+    def _get_timestamp_from_path(self, path):
+        path_splits = list(map(int, path.split(os.path.sep)))
         ts = 0
         for d, dir_number in zip(self._cumsum_directory_breadths(),
-                                 dir_slices):
+                                 path_splits):
             ts += dir_number * 10 ** d
         return ts
 
-    def _one_directory_earlier(self, dir_slices):
-        if type(dir_slices) == int:
-            dir_slices = self._directory_slices_for_ts(dir_slices)
-        ts = self._get_timestamp_for_directory_slice(dir_slices)
+    def _one_directory_earlier(self, path):
+        if type(path) == int:
+            path = self._path_for_ts(path)
+        ts = self._get_timestamp_from_path(path)
         ts -= 10**self._cumsum_directory_breadths()[-1]
-        return self._directory_slices_for_ts(ts)
+        return self._path_for_ts(ts)
 
     def _create_file_and_symlinks(self, begin_ts, end_ts, cam_id,
                                   extension=''):
         def spans_multiple_directories(first_ts, end_ts):
-            return self._directory_slices_for_ts(first_ts) != \
-                self._directory_slices_for_ts(end_ts)
+            return self._path_for_ts(first_ts) != \
+                self._path_for_ts(end_ts)
         fname = self._get_filename(begin_ts, end_ts, cam_id, extension)
         os.makedirs(os.path.dirname(fname), exist_ok=True)
         if not os.path.exists(fname):
@@ -376,29 +375,28 @@ class Repository:
         iter_ts = end_ts
         symlinks = []
         while spans_multiple_directories(begin_ts, iter_ts):
-            dir_slices = self._directory_slices_for_ts(iter_ts)
+            path = self._path_for_ts(iter_ts)
             link_fname = self._get_filename(begin_ts, end_ts, cam_id,
-                                           extension, dir_slices)
+                                            extension, path)
             symlinks.append(link_fname)
             link_dir = os.path.dirname(link_fname)
             os.makedirs(link_dir, exist_ok=True)
             rel_goal = os.path.relpath(fname, start=link_dir)
             os.symlink(rel_goal, link_fname)
-            iter_dir_slices = self._one_directory_earlier(iter_ts)
-            iter_ts = self._get_timestamp_for_directory_slice(iter_dir_slices)
+            iter_path = self._one_directory_earlier(iter_ts)
+            iter_ts = self._get_timestamp_from_path(iter_path)
         return fname, symlinks
 
-    def _get_filename(self, begin_ts, end_ts, cam_id, extension='',
-                     dir_slices=None):
+    def _get_filename(self, begin_ts, end_ts, cam_id, extension='', path=None):
         assert type(cam_id) is int
+        assert type(path) is str or path is None
 
-        if dir_slices is None:
-            dir_slices = self._directory_slices_for_ts(begin_ts)
+        if path is None:
+            path = self._path_for_ts(begin_ts)
         basename = get_video_fname(cam_id, begin_ts, end_ts)
         if extension != '':
             basename += '.' + extension
-        full_slices = dir_slices + [basename]
-        return self._join_with_repo_dir(*full_slices)
+        return self._join_with_repo_dir(path, basename)
 
     def _repo_json_fname(self):
         return os.path.join(self.root_dir, 'bbb_repo.json')
