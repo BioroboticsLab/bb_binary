@@ -291,18 +291,6 @@ class Repository:
                 found_files.append(self._join_with_repo_dir(*full_slices))
         return found_files
 
-    def get_filename(self, begin_ts, end_ts, cam_id, extension='',
-                     dir_slices=None):
-        assert type(cam_id) is int
-
-        if dir_slices is None:
-            dir_slices = self._directory_slices_for_ts(begin_ts)
-        basename = get_video_fname(cam_id, begin_ts, end_ts)
-        if extension != '':
-            basename += '.' + extension
-        full_slices = dir_slices + [basename]
-        return self._join_with_repo_dir(*full_slices)
-
     def get_directory_for_ts(self, timestamp):
         """Returns the directory where this timestamp would be stored."""
         return self._join_with_repo_dir(
@@ -381,7 +369,7 @@ class Repository:
         def spans_multiple_directories(first_ts, end_ts):
             return self._directory_slices_for_ts(first_ts) != \
                 self._directory_slices_for_ts(end_ts)
-        fname = self.get_filename(begin_ts, end_ts, cam_id, extension)
+        fname = self._get_filename(begin_ts, end_ts, cam_id, extension)
         os.makedirs(os.path.dirname(fname), exist_ok=True)
         if not os.path.exists(fname):
             open(fname, 'a').close()
@@ -389,7 +377,7 @@ class Repository:
         symlinks = []
         while spans_multiple_directories(begin_ts, iter_ts):
             dir_slices = self._directory_slices_for_ts(iter_ts)
-            link_fname = self.get_filename(begin_ts, end_ts, cam_id,
+            link_fname = self._get_filename(begin_ts, end_ts, cam_id,
                                            extension, dir_slices)
             symlinks.append(link_fname)
             link_dir = os.path.dirname(link_fname)
@@ -399,6 +387,18 @@ class Repository:
             iter_dir_slices = self._one_directory_earlier(iter_ts)
             iter_ts = self._get_timestamp_for_directory_slice(iter_dir_slices)
         return fname, symlinks
+
+    def _get_filename(self, begin_ts, end_ts, cam_id, extension='',
+                     dir_slices=None):
+        assert type(cam_id) is int
+
+        if dir_slices is None:
+            dir_slices = self._directory_slices_for_ts(begin_ts)
+        basename = get_video_fname(cam_id, begin_ts, end_ts)
+        if extension != '':
+            basename += '.' + extension
+        full_slices = dir_slices + [basename]
+        return self._join_with_repo_dir(*full_slices)
 
     def _repo_json_fname(self):
         return os.path.join(self.root_dir, 'bbb_repo.json')

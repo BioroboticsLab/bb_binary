@@ -125,7 +125,7 @@ def test_bbb_repo_get_ts_for_directory_slices(tmpdir):
 def fill_repository(repo, begin_end_cam_id):
     for begin, end, cam_id in begin_end_cam_id:
         params = begin, end, cam_id, 'bbb'
-        fname = repo.get_filename(*params)
+        fname = repo._get_filename(*params)
         os.makedirs(os.path.dirname(fname), exist_ok=True)
         with open(fname, 'w+') as f:
             f.write(str(begin))
@@ -206,7 +206,7 @@ def test_bbb_repo_add_frame_container(tmpdir):
 
     repo.add(fc)
     fnames = repo.find(1000)
-    expected_fname = repo.get_filename(fc.fromTimestamp,
+    expected_fname = repo._get_filename(fc.fromTimestamp,
                                        fc.toTimestamp, cam_id, 'bbb')
     expected_fname = os.path.basename(expected_fname)
     assert os.path.basename(fnames[0]) == expected_fname
