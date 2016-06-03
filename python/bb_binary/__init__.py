@@ -141,6 +141,21 @@ def build_frame(
 ):
     """
     Builds a frame from a numpy array.
+    The structure of the numpy array:
+        tagIdx
+        xpos
+        ypos
+        xposHive
+        yposHive
+        zRotation
+        yRotation
+        xRotation
+        radius
+        bit_0
+        bit_1
+        ...
+        bit_n
+
     Usage (not tested):
     ```
     frames = [(timestamp, pipeline(image_to_timestamp))]
@@ -226,23 +241,22 @@ class Repository:
     The Repository class manages multiple bb_binary files. It creates a
     directory layout that enables fast access by the timestamp.
     """
-    def __init__(self, root_dir, directory_breadths=None):
+    def __init__(self, root_dir, breadth_exponents=None):
         """
         Creates a new repository at `root_dir`.
 
         Args:
             root_dir (str):  Path where the repository is created
-            directory_breadths (Optional list[int]): breaths of the directories
-                at the different level. For an int value of `n` there are
-                `10**n` possible branch-offs at this level.
+            breadth_exponents (Optional list[int]): defines the breaths of the different levels.
+                The actuall breadth of the level i is `10 ** breadth_exponents[i]`.
                 Default value is `[3, 3, 3, 5]`.
         """
         self.root_dir = root_dir
         if not os.path.exists(self.root_dir):
             os.makedirs(self.root_dir)
-        if directory_breadths is None:
-            directory_breadths = [3, 3, 3, 5]
-        self.directory_breadths = directory_breadths
+        if breadth_exponents is None:
+            breadth_exponents = [3, 3, 3, 5]
+        self.breadth_exponents = breadth_exponents
         if not os.path.exists(self._repo_json_fname()):
             self._save_json()
 
@@ -250,12 +264,12 @@ class Repository:
     def nb_levels(self):
         """the number of directory levels"""
         # last breaths is the file level
-        return len(self.directory_breadths) - 1
+        return len(self.breadth_exponents) - 1
 
     @property
     def max_ts(self):
         """Returns the maximum possible timestamp"""
-        return 10**sum(self.directory_breadths) - 1
+        return 10**sum(self.breadth_exponents) - 1
 
     def can_contain_ts(self, timestamp):
         """Can this repository contain the timestamp"""
@@ -283,7 +297,7 @@ class Repository:
             if cam_id == cam_id:
                 return load_frame_container(fname)
 
-    def find(self, ts):
+    def find(self, ts, cam=None):
         """
         Returns all files that includes detections to the given timestamp `ts`.
         """
@@ -293,6 +307,8 @@ class Repository:
         except FileNotFoundError:
             return []
         parts = [parse_fname(f) for f in fnames]
+        if cam is not None:
+            parts = list(filter(lambda p: p[0] == cam, parts))
         begin_end_fnames = [(p[1], p[2], f) for p, f in zip(parts, fnames)]
         found_files = []
         for begin, end, fname in begin_end_fnames:
@@ -380,7 +396,7 @@ class Repository:
                 n -= n_d * base
 
         path_pieces = []
-        for t, d in zip(split_number(timestamp), self.directory_breadths):
+        for t, d in zip(split_number(timestamp), self.breadth_exponents):
             path_pieces.append(convert_timestamp_to_path(t, d))
         path =  os.path.join(*path_pieces[:-1])
         if abs:
@@ -409,8 +425,8 @@ class Repository:
         return self._get_directory(max)
 
     def _cumsum_directory_breadths(self):
-        return [sum(self.directory_breadths[i:])
-                for i in range(0, len(self.directory_breadths))]
+        return [sum(self.breadth_exponents[i:])
+                for i in range(0, len(self.breadth_exponents))]
 
     def _level_bases(self):
         exponents = self._cumsum_directory_breadths()[1:] + [1]
@@ -439,7 +455,7 @@ class Repository:
             ts = path
         else:
             ts = self._get_timestamp_from_path(path)
-        offset = 10**self.directory_breadths[-1]
+        offset = 10**self.breadth_exponents[-1]
         if direction == 'forward':
             ts += offset
         elif direction == 'backward':
@@ -508,5 +524,5 @@ class Repository:
     def _to_config(self):
         return {
             'root_dir': self.root_dir,
-            'directory_breadths': self.directory_breadths,
+            'breadth_exponents': self.breadth_exponents,
         }

@@ -84,11 +84,11 @@ def test_bbb_repo_save_json(tmpdir):
 
 
 def test_bbb_repo_path_for_ts(tmpdir):
-    repo = Repository(str(tmpdir), directory_breadths=[2]*4)
+    repo = Repository(str(tmpdir), breadth_exponents=[2]*4)
     path = repo._path_for_ts(3000)
     assert path == '00/00/30'
 
-    repo = Repository(str(tmpdir), directory_breadths=[3]*4)
+    repo = Repository(str(tmpdir), breadth_exponents=[3]*4)
 
     path = repo._path_for_ts(58000)
     assert path == '000/000/058'
@@ -114,7 +114,7 @@ def test_bbb_repo_path_for_ts(tmpdir):
 
 
 def test_bbb_repo_get_ts_from_path(tmpdir):
-    repo = Repository(str(tmpdir), directory_breadths=[2]*4)
+    repo = Repository(str(tmpdir), breadth_exponents=[2]*4)
 
     path = '00/10/01'
     assert repo._get_timestamp_from_path(path) == 100100
@@ -153,7 +153,7 @@ def find_and_assert_begin(repo, timestamp, expect_begin, nb_files_found=1):
 
 
 def test_bbb_repo_find_single_file_per_timestamp(tmpdir):
-    repo = Repository(str(tmpdir), directory_breadths=[3]*3 + [3])
+    repo = Repository(str(tmpdir), breadth_exponents=[3]*3 + [3])
     span = 500
     begin_end_cam_id = [(ts, ts + span, 0) for ts in range(0, 100000, span)]
 
@@ -172,7 +172,7 @@ def test_bbb_repo_find_single_file_per_timestamp(tmpdir):
 
 def test_bbb_repo_iter_fnames(tmpdir):
     repo = Repository(str(tmpdir.join('2_files_and_1_symlink_per_directory')),
-                      directory_breadths=[3]*3 + [3])
+                      breadth_exponents=[3]*3 + [3])
     span = 500
     begin_end_cam_id = [(ts, ts + span + 100, 0) for ts in range(0, 10000, span)]
 
@@ -184,7 +184,7 @@ def test_bbb_repo_iter_fnames(tmpdir):
     assert fnames == expected_fnames
 
     repo = Repository(str(tmpdir.join('missing_directories')),
-                      directory_breadths=[3]*3 + [3])
+                      breadth_exponents=[3]*3 + [3])
     span = 1500
     begin_end_cam_id = [(ts, ts + span, 0)
                         for ts in range(0, 10000, span)]
@@ -199,7 +199,7 @@ def test_bbb_repo_iter_fnames(tmpdir):
     assert fbasenames == expected_fnames
 
     repo = Repository(str(tmpdir.join('complex_from_to')),
-                      directory_breadths=[3]*3 + [3])
+                      breadth_exponents=[3]*3 + [3])
     span = 1500
     begin_end_cam_id = [(ts, ts + span, 0)
                         for ts in range(0, 10000, span)]
@@ -219,7 +219,7 @@ def test_bbb_repo_iter_fnames(tmpdir):
     assert fbasenames == expected_fnames
 
     repo = Repository(str(tmpdir.join('complex_from_to_and_cam')),
-                      directory_breadths=[3]*3 + [3])
+                      breadth_exponents=[3]*3 + [3])
     span = 1500
     begin_end_cam_id0 = [(ts, ts + span, 0) for ts in range(0, 10000, span)]
     begin_end_cam_id1 = [(ts, ts + span, 1) for ts in range(0, 10000, span)]
@@ -246,7 +246,7 @@ def test_bbb_repo_iter_fnames(tmpdir):
 
 
 def test_bbb_repo_find_multiple_file_per_timestamp(tmpdir):
-    repo = Repository(str(tmpdir), directory_breadths=[3]*3 + [3])
+    repo = Repository(str(tmpdir), breadth_exponents=[3]*3 + [3])
     span = 500
     begin = 1000
     end = 100000
@@ -264,7 +264,7 @@ def test_bbb_repo_find_multiple_file_per_timestamp(tmpdir):
 
 
 def test_bbb_create_symlinks(tmpdir):
-    repo = Repository(str(tmpdir), directory_breadths=[3]*3 + [3])
+    repo = Repository(str(tmpdir), breadth_exponents=[3]*3 + [3])
     fname, symlinks = repo._create_file_and_symlinks(0, 2000, 0, 'bbb')
     with open(fname, 'w') as f:
         f.write("hello world!")
@@ -282,7 +282,7 @@ def test_bbb_create_symlinks(tmpdir):
 
 
 def test_bbb_repo_add_frame_container(tmpdir):
-    repo = Repository(str(tmpdir), directory_breadths=[3]*3 + [3])
+    repo = Repository(str(tmpdir), breadth_exponents=[3]*3 + [3])
     cam_id = 1
     fc = build_frame_container(1000, 5000, 1)
 
@@ -301,7 +301,7 @@ def test_bbb_repo_add_frame_container(tmpdir):
 
 
 def test_bbb_repo_open_frame_container(tmpdir):
-    repo = Repository(str(tmpdir), directory_breadths=[3]*3 + [3])
+    repo = Repository(str(tmpdir), breadth_exponents=[3]*3 + [3])
     cam_id = 1
     fc = build_frame_container(1000, 5000, cam_id)
 
