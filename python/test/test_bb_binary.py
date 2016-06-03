@@ -269,6 +269,7 @@ def example_experiment_repo(request):
     request.addfinalizer(fin)
     return repo, begin, end
 
+
 @pytest.mark.slow
 def test_benchmark_find(benchmark, example_experiment_repo):
     repo, begin, end = example_experiment_repo
@@ -277,3 +278,30 @@ def test_benchmark_find(benchmark, example_experiment_repo):
         ts = random.randint(begin, end)
         repo.find(ts)
     benchmark(find)
+
+
+@pytest.mark.slow
+def test_benchmark_add(benchmark, example_experiment_repo):
+    repo, begin, end = example_experiment_repo
+
+    ts = random.randint(begin, end)
+    duration = 500 + random.randint(0, 250)
+    cam_id = 0
+    nb_bits = 12
+    frame_container = build_frame_container(ts, ts + duration, cam_id)
+                                            )
+    frames = frame_container.init('frames', 1024)
+    frame_ts = ts
+    for frame in frames:
+        nb_detections = random.randint(75, 150)
+        detections = np.random.uniform(
+            0, 1, (nb_detections, nb_parameters(nb_bits)))
+        build_frame(frame, frame_ts, detections)
+
+    def add():
+        ts = random.randint(begin, end)
+        duration = 500 + random.randint(0, 250)
+        frame_container.fromTimestamp = ts
+        frame_container.toTimestamp = ts + duration
+        repo.add(frame_container)
+    benchmark(add)
