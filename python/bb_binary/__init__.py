@@ -300,10 +300,53 @@ class Repository:
                 found_files.append(self._join_with_repo_dir(path, fname))
         return found_files
 
-    def get_directory_for_ts(self, timestamp):
-        """Returns the directory where this timestamp would be stored."""
-        return self._join_with_repo_dir(
-            *self._path_for_ts(timestamp))
+    def iter_fnames(self, begin=None, end=None, cam=None):
+        """
+        Returns a generator that yields fnames in sorted order.
+        From `begin` to `end`.
+
+        Args:
+            begin (Optional timestamp): start with this timestamp.
+                If not set start with the frirst one.
+            end (Optional timestamp): last timestamp. If not set, start with
+                the earliest file.
+            cam (Optional int): Only yield fnames from this cam id.
+        """
+
+        def filter_no_links(directory, fnames):
+            return list(filter(
+                lambda f: not os.path.islink(os.path.join(directory, f)),
+                fnames))
+
+        if begin is None:
+            current_path = self._get_earliest_path()
+        else:
+            current_path = self._path_for_ts(begin, abs=True)
+
+        if end is not None:
+            end_dir = self._path_for_ts(end, abs=True)
+        else:
+            end_dir = self._get_latest_path()
+        while True:
+            fnames = self._all_files_in(current_path)
+            fnames = filter_no_links(current_path, fnames)
+            parts = [parse_fname(f) for f in fnames]
+            begin_fnames = [(p[0], p[1], f) for p, f in zip(parts, fnames)]
+            if cam is not None:
+                begin_fnames = list(filter(lambda p: p[0] == cam,
+                                           begin_fnames))
+
+            begin_fnames = sorted(begin_fnames, key=lambda p: p[1])
+            for cam_idx, ts, fname in begin_fnames:
+                yield self._join_with_repo_dir(current_path, fname)
+            print(end_dir)
+            print(current_path)
+            if end_dir == current_path:
+                break
+            else:
+                current_path = self._step_to_next_directory(
+                    current_path, direction='forward')
+                current_path = self._join_with_repo_dir(current_path)
 
     @staticmethod
     def load(directory):
@@ -323,7 +366,7 @@ class Repository:
         with open(self._repo_json_fname(), 'w+') as f:
             json.dump(self._to_config(), f)
 
-    def _path_for_ts(self, timestamp):
+    def _path_for_ts(self, timestamp, abs=False):
         assert self.can_contain_ts(timestamp)
 
         def convert_timestamp_to_path(ts, max_digets):
@@ -339,7 +382,31 @@ class Repository:
         path_pieces = []
         for t, d in zip(split_number(timestamp), self.directory_breadths):
             path_pieces.append(convert_timestamp_to_path(t, d))
-        return os.path.join(*path_pieces[:-1])
+        path =  os.path.join(*path_pieces[:-1])
+        if abs:
+            return self._join_with_repo_dir(path)
+        else:
+            return path
+
+    def _get_directory(self, selection_fn):
+        def directories(dirname):
+            return [os.path.join(dirname, d) for d in os.listdir(dirname)
+                    if os.path.isdir(os.path.join(dirname, d))]
+
+        current_dir = self.root_dir
+        while True:
+            dirs = directories(current_dir)
+
+            if dirs:
+                current_dir = selection_fn(dirs)
+            else:
+                return current_dir
+
+    def _get_earliest_path(self):
+        return self._get_directory(min)
+
+    def _get_latest_path(self):
+        return self._get_directory(max)
 
     def _cumsum_directory_breadths(self):
         return [sum(self.directory_breadths[i:])
@@ -367,12 +434,38 @@ class Repository:
             ts += dir_number * base
         return ts
 
-    def _one_directory_earlier(self, path):
+    def _step_one_directory(self, path, direction='forward'):
         if type(path) == int:
-            path = self._path_for_ts(path)
-        ts = self._get_timestamp_from_path(path)
-        ts -= 10**self._cumsum_directory_breadths()[-1]
+            ts = path
+        else:
+            ts = self._get_timestamp_from_path(path)
+        offset = 10**self.directory_breadths[-1]
+        if direction == 'forward':
+            ts += offset
+        elif direction == 'backward':
+            ts -= offset
+        else:
+            raise ValueError("Unknown direction {}.".format(direction))
         return self._path_for_ts(ts)
+
+    def _step_to_next_directory(self, path, direction='forward'):
+        if direction == 'forward':
+            end = self._get_latest_path()
+            path_ts = self._get_timestamp_from_path(path)
+            end_ts = self._get_timestamp_from_path(end)
+            assert path_ts < end_ts
+
+        elif direction == 'backward':
+            begin = self._get_earliest_path()
+            assert self._get_timestamp_from_path(begin) < \
+                self._get_timestamp_from_path(path)
+        else:
+            raise ValueError("Unknown direction {}.".format(direction))
+        current_path = path
+        while True:
+            current_path = self._step_one_directory(current_path, direction)
+            if os.path.exists(self._join_with_repo_dir(current_path)):
+                return current_path
 
     def _create_file_and_symlinks(self, begin_ts, end_ts, cam_id,
                                   extension=''):
@@ -394,7 +487,7 @@ class Repository:
             os.makedirs(link_dir, exist_ok=True)
             rel_goal = os.path.relpath(fname, start=link_dir)
             os.symlink(rel_goal, link_fname)
-            iter_path = self._one_directory_earlier(iter_ts)
+            iter_path = self._step_one_directory(iter_ts, 'backward')
             iter_ts = self._get_timestamp_from_path(iter_path)
         return fname, symlinks
 

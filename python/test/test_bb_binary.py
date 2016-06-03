@@ -170,6 +170,81 @@ def test_bbb_repo_find_single_file_per_timestamp(tmpdir):
         find_and_assert_begin(repo, 50000, 50)
 
 
+def test_bbb_repo_iter_fnames(tmpdir):
+    repo = Repository(str(tmpdir.join('2_files_and_1_symlink_per_directory')),
+                      directory_breadths=[3]*3 + [3])
+    span = 500
+    begin_end_cam_id = [(ts, ts + span + 100, 0) for ts in range(0, 10000, span)]
+
+    fill_repository(repo, begin_end_cam_id)
+
+    fnames = [os.path.basename(f) for f in repo.iter_fnames()]
+    expected_fnames = [os.path.basename(
+        repo._get_filename(*p, extension='bbb')) for p in begin_end_cam_id]
+    assert fnames == expected_fnames
+
+    repo = Repository(str(tmpdir.join('missing_directories')),
+                      directory_breadths=[3]*3 + [3])
+    span = 1500
+    begin_end_cam_id = [(ts, ts + span, 0)
+                        for ts in range(0, 10000, span)]
+
+    fill_repository(repo, begin_end_cam_id)
+    fnames = list(repo.iter_fnames())
+    for fname in fnames:
+        assert os.path.isabs(fname)
+    fbasenames = [os.path.basename(f) for f in fnames]
+    expected_fnames = [os.path.basename(
+        repo._get_filename(*p, extension='bbb')) for p in begin_end_cam_id]
+    assert fbasenames == expected_fnames
+
+    repo = Repository(str(tmpdir.join('complex_from_to')),
+                      directory_breadths=[3]*3 + [3])
+    span = 1500
+    begin_end_cam_id = [(ts, ts + span, 0)
+                        for ts in range(0, 10000, span)]
+
+    fill_repository(repo, begin_end_cam_id)
+    begin = 2500
+    end = 5000
+    fnames = list(repo.iter_fnames(begin, end))
+    for fname in fnames:
+        assert os.path.isabs(fname)
+    fbasenames = [os.path.basename(f) for f in fnames]
+    slice_begin_end_cam_id = list(filter(lambda p: begin <= p[0] <= end,
+                                         begin_end_cam_id))
+    expected_fnames = [os.path.basename(
+        repo._get_filename(*p, extension='bbb'))
+                       for p in slice_begin_end_cam_id]
+    assert fbasenames == expected_fnames
+
+    repo = Repository(str(tmpdir.join('complex_from_to_and_cam')),
+                      directory_breadths=[3]*3 + [3])
+    span = 1500
+    begin_end_cam_id0 = [(ts, ts + span, 0) for ts in range(0, 10000, span)]
+    begin_end_cam_id1 = [(ts, ts + span, 1) for ts in range(0, 10000, span)]
+
+    begin_end_cam_id = begin_end_cam_id0 + begin_end_cam_id1
+
+    fill_repository(repo, begin_end_cam_id)
+    begin = 2500
+    end = 5000
+    cam = 0
+    fnames = list(repo.iter_fnames(begin, end, cam))
+    for fname in fnames:
+        assert os.path.isabs(fname)
+    fbasenames = [os.path.basename(f) for f in fnames]
+    slice_begin_end_cam_id = list(filter(
+        lambda p: begin <= p[0] <= end and p[2] == cam,
+        begin_end_cam_id))
+    expected_fnames = [os.path.basename(
+        repo._get_filename(*p, extension='bbb'))
+                       for p in slice_begin_end_cam_id]
+    assert fbasenames == expected_fnames
+
+
+
+
 def test_bbb_repo_find_multiple_file_per_timestamp(tmpdir):
     repo = Repository(str(tmpdir), directory_breadths=[3]*3 + [3])
     span = 500
@@ -214,7 +289,7 @@ def test_bbb_repo_add_frame_container(tmpdir):
     repo.add(fc)
     fnames = repo.find(1000)
     expected_fname = repo._get_filename(fc.fromTimestamp,
-                                       fc.toTimestamp, cam_id, 'bbb')
+                                        fc.toTimestamp, cam_id, 'bbb')
     expected_fname = os.path.basename(expected_fname)
     assert os.path.basename(fnames[0]) == expected_fname
 
