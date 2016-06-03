@@ -90,8 +90,8 @@ def get_video_fname(camIdx, begin, end):
     return get_fname(camIdx, begin) + "_TO_" + get_fname(camIdx, end)
 
 
-def get_cam_id(fc: FrameContainer):
-    return fc.dataSources[0].cam.camId
+def get_cam_id(frame_container):
+    return frame_container.dataSources[0].cam.camId
 
 
 def convert_detections_to_numpy(frame):
