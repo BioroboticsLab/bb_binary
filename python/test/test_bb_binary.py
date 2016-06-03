@@ -7,10 +7,13 @@ import datetime
 import numpy as np
 import pytest
 import os
+import random
+import tempfile
+import shutil
 
 
 def test_bbb_is_loaded():
-    frame = bbb.Frame.new_message()
+    frame = Frame.new_message()
     assert hasattr(frame, 'timestamp')
 
 
@@ -76,20 +79,20 @@ def test_bbb_convert_detections_to_numpy():
 
 
 def test_bbb_repo_save_json(tmpdir):
-    repo = bbb.Repository(str(tmpdir), 0)
+    repo = Repository(str(tmpdir), 0)
     assert tmpdir.join('bbb_repo.json').exists()
 
-    loaded_repo = bbb.Repository.load(str(tmpdir))
+    loaded_repo = Repository.load(str(tmpdir))
     assert repo == loaded_repo
 
 
 def test_bbb_repo_directory_slices_for_ts(tmpdir):
-    repo = bbb.Repository(str(tmpdir), directory_breadths=[2]*4,
+    repo = Repository(str(tmpdir), directory_breadths=[2]*4,
                           )
     dirs = list(repo._directory_slices_for_ts(3000))
     assert dirs == ['00', '00', '30']
 
-    repo = bbb.Repository(str(tmpdir), directory_breadths=[3]*4)
+    repo = Repository(str(tmpdir), directory_breadths=[3]*4)
 
     dirs = list(repo._directory_slices_for_ts(58000))
     assert dirs == ['000', '000', '058']
@@ -111,7 +114,7 @@ def test_bbb_repo_directory_slices_for_ts(tmpdir):
 
 
 def test_bbb_repo_get_ts_for_directory_slices(tmpdir):
-    repo = bbb.Repository(str(tmpdir), directory_breadths=[2]*4)
+    repo = Repository(str(tmpdir), directory_breadths=[2]*4)
 
     dir_slices = ['00', '10', '01']
     assert repo._get_timestamp_for_directory_slice(dir_slices) == 100100
@@ -146,7 +149,7 @@ def find_and_assert_begin(repo, timestamp, expect_begin, nb_files_found=1):
 
 
 def test_bbb_repo_find_single_file_per_timestamp(tmpdir):
-    repo = bbb.Repository(str(tmpdir), directory_breadths=[3]*3 + [3])
+    repo = Repository(str(tmpdir), directory_breadths=[3]*3 + [3])
     span = 500
     begin_end_cam_id = [(ts, ts + span, 0) for ts in range(0, 100000, span)]
 
@@ -164,7 +167,7 @@ def test_bbb_repo_find_single_file_per_timestamp(tmpdir):
 
 
 def test_bbb_repo_find_multiple_file_per_timestamp(tmpdir):
-    repo = bbb.Repository(str(tmpdir), directory_breadths=[3]*3 + [3])
+    repo = Repository(str(tmpdir), directory_breadths=[3]*3 + [3])
     span = 500
     begin = 1000
     end = 100000
@@ -182,7 +185,7 @@ def test_bbb_repo_find_multiple_file_per_timestamp(tmpdir):
 
 
 def test_bbb_create_symlinks(tmpdir):
-    repo = bbb.Repository(str(tmpdir), directory_breadths=[3]*3 + [3])
+    repo = Repository(str(tmpdir), directory_breadths=[3]*3 + [3])
     fname, symlinks = repo._create_file_and_symlinks(0, 2000, 0, 'bbb')
     with open(fname, 'w') as f:
         f.write("hello world!")
@@ -200,7 +203,7 @@ def test_bbb_create_symlinks(tmpdir):
 
 
 def test_bbb_repo_add_frame_container(tmpdir):
-    repo = bbb.Repository(str(tmpdir), directory_breadths=[3]*3 + [3])
+    repo = Repository(str(tmpdir), directory_breadths=[3]*3 + [3])
     cam_id = 1
     fc = build_frame_container(1000, 5000, 1)
 
@@ -219,7 +222,7 @@ def test_bbb_repo_add_frame_container(tmpdir):
 
 
 def test_bbb_repo_open_frame_container(tmpdir):
-    repo = bbb.Repository(str(tmpdir), directory_breadths=[3]*3 + [3])
+    repo = Repository(str(tmpdir), directory_breadths=[3]*3 + [3])
     cam_id = 1
     fc = build_frame_container(1000, 5000, cam_id)
 
