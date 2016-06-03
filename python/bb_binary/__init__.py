@@ -309,9 +309,8 @@ class Repository:
         parts = [parse_fname(f) for f in fnames]
         if cam is not None:
             parts = list(filter(lambda p: p[0] == cam, parts))
-        begin_end_fnames = [(p[1], p[2], f) for p, f in zip(parts, fnames)]
         found_files = []
-        for begin, end, fname in begin_end_fnames:
+        for (camId, begin, end), fname in zip(parts, fnames):
             if begin <= ts < end:
                 found_files.append(self._join_with_repo_dir(path, fname))
         return found_files

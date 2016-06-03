@@ -1,4 +1,5 @@
 
+from conftest import fill_repository
 from bb_binary import build_frame_container, parse_video_fname, Frame, \
     Repository, convert_detections_to_numpy, build_frame, nb_parameters
 
@@ -7,9 +8,6 @@ import datetime
 import numpy as np
 import pytest
 import os
-import random
-import tempfile
-import shutil
 
 
 def test_bbb_is_loaded():
@@ -127,16 +125,6 @@ def test_bbb_repo_get_ts_from_path(tmpdir):
     path = repo._path_for_ts(ts)
     assert path == '00/00/30'
     assert repo._get_timestamp_from_path(path) == ts
-
-
-def fill_repository(repo, begin_end_cam_id):
-    for begin, end, cam_id in begin_end_cam_id:
-        params = begin, end, cam_id, 'bbb'
-        fname = repo._get_filename(*params)
-        os.makedirs(os.path.dirname(fname), exist_ok=True)
-        with open(fname, 'w+') as f:
-            f.write(str(begin))
-        repo._create_file_and_symlinks(*params)
 
 
 def find_and_assert_begin(repo, timestamp, expect_begin, nb_files_found=1):
