@@ -238,11 +238,19 @@ class Repository:
                 Default value is `[3, 3, 3, 5]`.
         """
         self.root_dir = root_dir
+        if not os.path.exists(self.root_dir):
+            os.makedirs(self.root_dir)
         if directory_breadths is None:
             directory_breadths = [3, 3, 3, 5]
         self.directory_breadths = directory_breadths
         if not os.path.exists(self._repo_json_fname()):
             self._save_json()
+
+    @property
+    def nb_levels(self):
+        """the number of directory levels"""
+        # last breaths is the file level
+        return len(self.directory_breadths) - 1
 
     @property
     def max_ts(self):
@@ -323,13 +331,10 @@ class Repository:
             return format_str.format(ts)
 
         def split_number(n):
-            d = 0
-            depths = [sum(self.directory_breadths[i:-1])
-                      for i in range(len(self.directory_breadths))]
-            for d in depths:
-                n_d = int(math.floor(n / 10 ** d))
+            for base in self._level_bases():
+                n_d = int(math.floor(n / base))
                 yield n_d
-                n -= n_d * 10 ** (d)
+                n -= n_d * base
 
         path_pieces = []
         for t, d in zip(split_number(timestamp), self.directory_breadths):
@@ -337,8 +342,12 @@ class Repository:
         return os.path.join(*path_pieces[:-1])
 
     def _cumsum_directory_breadths(self):
-        return [sum(self.directory_breadths[i:-1])
-                for i in range(len(self.directory_breadths))]
+        return [sum(self.directory_breadths[i:])
+                for i in range(0, len(self.directory_breadths))]
+
+    def _level_bases(self):
+        exponents = self._cumsum_directory_breadths()[1:] + [1]
+        return [10**e for e in exponents]
 
     def _join_with_repo_dir(self, *paths):
         return os.path.join(self.root_dir, *paths)
@@ -351,11 +360,11 @@ class Repository:
                 if isfile_or_link(os.path.join(dirname, f))]
 
     def _get_timestamp_from_path(self, path):
-        path_splits = list(map(int, path.split(os.path.sep)))
+        path_splits = path.split(os.path.sep)[-self.nb_levels:]
+        path_splits = list(map(int, path_splits))
         ts = 0
-        for d, dir_number in zip(self._cumsum_directory_breadths(),
-                                 path_splits):
-            ts += dir_number * 10 ** d
+        for base, dir_number in zip(self._level_bases(), path_splits):
+            ts += dir_number * base
         return ts
 
     def _one_directory_earlier(self, path):

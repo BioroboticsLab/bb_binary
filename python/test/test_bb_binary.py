@@ -83,7 +83,7 @@ def test_bbb_repo_save_json(tmpdir):
     assert repo == loaded_repo
 
 
-def test_bbb_repo_directory_slices_for_ts(tmpdir):
+def test_bbb_repo_path_for_ts(tmpdir):
     repo = Repository(str(tmpdir), directory_breadths=[2]*4)
     path = repo._path_for_ts(3000)
     assert path == '00/00/30'
@@ -92,6 +92,9 @@ def test_bbb_repo_directory_slices_for_ts(tmpdir):
 
     path = repo._path_for_ts(58000)
     assert path == '000/000/058'
+
+    path = repo._path_for_ts(99014358000)
+    assert path == '099/014/358'
 
     path = repo._path_for_ts(14358000)
     assert path == '000/014/358'
@@ -110,15 +113,19 @@ def test_bbb_repo_directory_slices_for_ts(tmpdir):
         repo._path_for_ts(repo.max_ts)
 
 
-def test_bbb_repo_get_ts_for_directory_slices(tmpdir):
+def test_bbb_repo_get_ts_from_path(tmpdir):
     repo = Repository(str(tmpdir), directory_breadths=[2]*4)
 
     path = '00/10/01'
     assert repo._get_timestamp_from_path(path) == 100100
 
-    # test inverse to directory_slices_for_ts
+    path = '50/10/99'
+    assert repo._get_timestamp_from_path(path) == 50109900
+
+    # test inverse to path_for_ts
     ts = 3000
     path = repo._path_for_ts(ts)
+    assert path == '00/00/30'
     assert repo._get_timestamp_from_path(path) == ts
 
 
