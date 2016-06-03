@@ -33,15 +33,13 @@ def test_bbb_frame_from_detections():
         assert capnp_detections[i].ypos == detections[i, 2]
         assert capnp_detections[i].xposHive == detections[i, 3]
         assert capnp_detections[i].yposHive == detections[i, 4]
-        assert capnp_detections[i].hiveId == detections[i, 5]
-        assert np.allclose(capnp_detections[i].zRotation, detections[i, 6])
-        assert np.allclose(capnp_detections[i].yRotation, detections[i, 7])
-        assert np.allclose(capnp_detections[i].xRotation, detections[i, 8])
-        assert np.allclose(capnp_detections[i].radius, detections[i, 9])
-
+        assert np.allclose(capnp_detections[i].zRotation, detections[i, 5])
+        assert np.allclose(capnp_detections[i].yRotation, detections[i, 6])
+        assert np.allclose(capnp_detections[i].xRotation, detections[i, 7])
+        assert np.allclose(capnp_detections[i].radius, detections[i, 8])
         assert np.allclose(
             np.array(list(capnp_detections[i].decodedId)) / 255,
-            detections[i, 10:],
+            detections[i, 9:],
             atol=0.5/255,
         )
 
@@ -69,12 +67,11 @@ def test_bbb_convert_detections_to_numpy():
     assert arr[0, 2] == detection.ypos
     assert arr[0, 3] == detection.yposHive
     assert arr[0, 4] == detection.yposHive
-    assert arr[0, 5] == detection.hiveId
-    assert arr[0, 6] == detection.zRotation
-    assert arr[0, 7] == detection.yRotation
-    assert arr[0, 8] == detection.xRotation
-    assert arr[0, 9] == detection.radius
-    assert np.allclose(arr[0, 10:], np.array([bit_value / 255] * nb_bits),
+    assert arr[0, 5] == detection.zRotation
+    assert arr[0, 6] == detection.yRotation
+    assert arr[0, 7] == detection.xRotation
+    assert arr[0, 8] == detection.radius
+    assert np.allclose(arr[0, 9:], np.array([bit_value / 255] * nb_bits),
                        atol=0.5/255)
 
 

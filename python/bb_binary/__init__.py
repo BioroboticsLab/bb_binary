@@ -104,7 +104,8 @@ def convert_detections_to_numpy(frame):
         "Currently only the new pipeline format is supported."
     detections = frame.detectionsUnion.detectionsDP
 
-    shape = (len(detections), nb_parameters(detections[0]))
+    nb_bits = len(detections[0].decodedId)
+    shape = (len(detections), nb_parameters(nb_bits))
     arr = np.zeros(shape, dtype=np.float32)
     for i, detection in enumerate(detections):
         arr[i, 0] = detection.tagIdx
@@ -112,27 +113,28 @@ def convert_detections_to_numpy(frame):
         arr[i, 2] = detection.ypos
         arr[i, 3] = detection.xposHive
         arr[i, 4] = detection.yposHive
-        arr[i, 5] = detection.hiveId
-        arr[i, 6] = detection.zRotation
-        arr[i, 7] = detection.yRotation
-        arr[i, 8] = detection.xRotation
-        arr[i, 9] = detection.radius
-        arr[i, 10:] = np.array(list(detection.decodedId)) / 255
+        arr[i, 5] = detection.zRotation
+        arr[i, 6] = detection.yRotation
+        arr[i, 7] = detection.xRotation
+        arr[i, 8] = detection.radius
+        arr[i, 9:] = np.array(list(detection.decodedId)) / 255.
 
     return arr
 
 
-def nb_parameters(detection):
+def nb_parameters(nb_bits):
     """Returns the number of parameter of the detections."""
-    return detection_dp_fields_before_ids + len(detection.decodedId)
+    return _detection_dp_fields_before_ids + nb_bits
 
-detection_dp_fields_before_ids = 10
+
+_detection_dp_fields_before_ids = 9
 
 
 def build_frame(
-        frame_builder,
+        frame,
         timestamp,
         detections,
+        data_source=0,
         detection_format='deeppipeline'
 ):
     """
@@ -144,27 +146,28 @@ def build_frame(
     fc = FrameContainer.new_message()
     frames_builder = fc.init('frames', len(frames))
     for i, (timestamp, detections) in enumerate(frames):
-        build_frame(frame_builder[i], timestamp, detections)
+        build_frame(frame[i], timestamp, detections)
     ```
     """
     assert detection_format == 'deeppipeline'
-    detec_builder = frame_builder.detectionsUnion.init('detectionsDP',
-                                                       len(detections))
+    frame.dataSource = int(data_source)
+    detec_builder = frame.detectionsUnion.init('detectionsDP',
+                                               len(detections))
     for i, detection in enumerate(detections):
         detec_builder[i].tagIdx = int(detection[0])
         detec_builder[i].xpos = int(detection[1])
         detec_builder[i].ypos = int(detection[2])
         detec_builder[i].xposHive = int(detection[3])
         detec_builder[i].yposHive = int(detection[4])
-        detec_builder[i].hiveId = int(detection[5])
-        detec_builder[i].zRotation = float(detection[6])
-        detec_builder[i].yRotation = float(detection[7])
-        detec_builder[i].xRotation = float(detection[8])
-        detec_builder[i].radius = float(detection[9])
+        detec_builder[i].zRotation = float(detection[5])
+        detec_builder[i].yRotation = float(detection[6])
+        detec_builder[i].xRotation = float(detection[7])
+        detec_builder[i].radius = float(detection[8])
 
-        nb_ids = len(detection) - detection_dp_fields_before_ids
+        nb_ids = len(detection) - _detection_dp_fields_before_ids
         decodedId = detec_builder[i].init('decodedId', nb_ids)
-        for j, bit in enumerate(detections[i, detection_dp_fields_before_ids:]):
+        for j, bit in enumerate(
+                detections[i, _detection_dp_fields_before_ids:]):
             decodedId[j] = int(round(255*bit))
 
 
