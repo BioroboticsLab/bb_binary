@@ -72,7 +72,7 @@ def parse_fname(fname):
     fname = os.path.basename(fname)
     try:
         return parse_video_fname(fname)
-    except Exception as e:
+    except:
         camIdx, dtime = parse_image_fname(fname)
         return camIdx, dtime, dtime
 
