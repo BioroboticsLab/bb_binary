@@ -159,6 +159,10 @@ def test_bbb_repo_find_single_file_per_timestamp(tmpdir):
 
 
 def test_bbb_repo_iter_fnames(tmpdir):
+    repo = Repository(str(tmpdir.join('empty')),
+                      breadth_exponents=[3]*3 + [3])
+    assert list(repo.iter_fnames()) == []
+
     repo = Repository(str(tmpdir.join('2_files_and_1_symlink_per_directory')),
                       breadth_exponents=[3]*3 + [3])
     span = 500

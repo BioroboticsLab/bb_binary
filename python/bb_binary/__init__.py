@@ -341,6 +341,9 @@ class Repository:
         else:
             current_path = self._path_for_ts(begin, abs=True)
 
+        if current_path == self.root_dir:
+            return
+
         if end is not None:
             end_dir = self._path_for_ts(end, abs=True)
         else:
