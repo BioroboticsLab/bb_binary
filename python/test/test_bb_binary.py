@@ -1,7 +1,7 @@
 
 from conftest import fill_repository
 from bb_binary import build_frame_container, parse_video_fname, Frame, \
-    Repository, convert_detections_to_numpy, build_frame, nb_parameters
+    Repository, convert_detections_to_numpy, build_frame
 
 import time
 import datetime
@@ -233,8 +233,6 @@ def test_bbb_repo_iter_fnames(tmpdir):
         repo._get_filename(*p, extension='bbb'))
                        for p in slice_begin_end_cam_id]
     assert fbasenames == expected_fnames
-
-
 
 
 def test_bbb_repo_find_multiple_file_per_timestamp(tmpdir):

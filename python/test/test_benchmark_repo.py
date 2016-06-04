@@ -1,7 +1,7 @@
 
 from conftest import fill_repository
-from bb_binary import build_frame_container, parse_video_fname, Frame, \
-    Repository, convert_detections_to_numpy, build_frame, nb_parameters
+from bb_binary import build_frame_container, Repository, build_frame, \
+    nb_parameters
 
 import time
 import numpy as np

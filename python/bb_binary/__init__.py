@@ -403,7 +403,7 @@ class Repository:
         path_pieces = []
         for t, d in zip(split_number(timestamp), self.breadth_exponents):
             path_pieces.append(convert_timestamp_to_path(t, d))
-        path =  os.path.join(*path_pieces[:-1])
+        path = os.path.join(*path_pieces[:-1])
         if abs:
             return self._join_with_repo_dir(path)
         else:
