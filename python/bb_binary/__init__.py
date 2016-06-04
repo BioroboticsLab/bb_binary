@@ -241,6 +241,9 @@ class Repository:
     The Repository class manages multiple bb_binary files. It creates a
     directory layout that enables fast access by the timestamp.
     """
+
+    _CONFIG_FNAME = '.bbb_repo_config.json'
+
     def __init__(self, root_dir, breadth_exponents=None):
         """
         Creates a new repository at `root_dir`.
@@ -366,7 +369,7 @@ class Repository:
     @staticmethod
     def load(directory):
         """Load the repository from this directory."""
-        config_fname = os.path.join(directory, 'bbb_repo.json')
+        config_fname = os.path.join(directory, Repository._CONFIG_FNAME)
         assert config_fname, \
             "Tries to load directory: {}, but file {} is missing".\
             format(directory, config_fname)
@@ -518,7 +521,7 @@ class Repository:
         return self._join_with_repo_dir(path, basename)
 
     def _repo_json_fname(self):
-        return os.path.join(self.root_dir, 'bbb_repo.json')
+        return os.path.join(self.root_dir, self._CONFIG_FNAME)
 
     def _to_config(self):
         return {

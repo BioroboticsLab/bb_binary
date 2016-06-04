@@ -75,7 +75,7 @@ def test_bbb_convert_detections_to_numpy():
 
 def test_bbb_repo_save_json(tmpdir):
     repo = Repository(str(tmpdir), 0)
-    assert tmpdir.join('bbb_repo.json').exists()
+    assert tmpdir.join(Repository._CONFIG_FNAME).exists()
 
     loaded_repo = Repository.load(str(tmpdir))
     assert repo == loaded_repo
