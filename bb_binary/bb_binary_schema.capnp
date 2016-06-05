@@ -32,16 +32,16 @@ struct DetectionDP {
   yRotation @6 :Float32;         # rotation of the grid in y plane
   xRotation @7 :Float32;         # rotation of the grid in z plane
   radius @8 :Float32;            # radius of the tag
-  localizerSaliency @9 :Float32;# saliency of the localizer network
+  localizerSaliency @9 :Float32; # saliency of the localizer network
   decodedId @10 :List(UInt8);    # the decoded id, the bit probabilities are discretised to 0-255
 }
 
 
 # Corresponds to an image in the video
 struct Frame {
-  id @0 :UInt64;                # global unique id of the frame
-  dataSource @1:UInt32;       # the frame is from this data source
-  timestamp @2 :UInt64;         # unix time stamp of the frame
+  id @0 :UInt64;                 # global unique id of the frame
+  dataSource @1:UInt32;          # the frame is from this data source
+  timestamp @2 :Float64;         # unix time stamp of the frame
   detectionsUnion : union {
     detectionsCVP @3 :List(DetectionCVP);     # detections format of the old computer vision pipeline
     detectionsDP  @4 :List(DetectionDP);      # detections format of the new deeppipeline
@@ -73,7 +73,7 @@ struct DataSource {
 struct FrameContainer {
   id @0 :UInt64;                    # global unique id of the frame container
   dataSources @1:List(DataSource);  # list of data sources (videos / images)
-  fromTimestamp @2 :UInt64;         # unix timestamp of the first frame
-  toTimestamp @3 :UInt64;           # unix timestamp of the last frame
+  fromTimestamp @2 :Float64;        # unix timestamp of the first frame
+  toTimestamp @3 :Float64;          # unix timestamp of the last frame
   frames @4 :List(Frame);           # frames are sorted by the timestamp in ascending order
 }

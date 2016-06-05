@@ -456,7 +456,7 @@ class Repository:
         return ts
 
     def _step_one_directory(self, path, direction='forward'):
-        if type(path) == int:
+        if type(path) in [int, float]:
             ts = path
         else:
             ts = self._get_timestamp_from_path(path)
