@@ -14,7 +14,6 @@ bbb = capnp.load(os.path.join(_dirname, 'bb_binary_schema.capnp'))
 Frame = bbb.Frame
 FrameContainer = bbb.FrameContainer
 DataSource = bbb.DataSource
-Cam = bbb.Cam
 DetectionCVP = bbb.DetectionCVP
 DetectionDP = bbb.DetectionDP
 
@@ -92,10 +91,6 @@ def get_video_fname(camIdx, begin, end):
     return get_fname(camIdx, begin) + "_TO_" + get_fname(camIdx, end)
 
 
-def get_cam_id(frame_container):
-    return frame_container.dataSources[0].cam.camId
-
-
 def convert_detections_to_numpy(frame):
     """
     Returns the detections as a numpy array from the frame.
@@ -110,7 +105,7 @@ def convert_detections_to_numpy(frame):
     shape = (len(detections), nb_parameters(nb_bits))
     arr = np.zeros(shape, dtype=np.float32)
     for i, detection in enumerate(detections):
-        arr[i, 0] = detection.tagIdx
+        arr[i, 0] = detection.idx
         arr[i, 1] = detection.xpos
         arr[i, 2] = detection.ypos
         arr[i, 3] = detection.xposHive
@@ -142,7 +137,7 @@ def build_frame(
     """
     Builds a frame from a numpy array.
     The structure of the numpy array:
-        tagIdx
+        idx
         xpos
         ypos
         xposHive
@@ -167,11 +162,11 @@ def build_frame(
     ```
     """
     assert detection_format == 'deeppipeline'
-    frame.dataSource = int(data_source)
+    frame.dataSourceIdx = int(data_source)
     detec_builder = frame.detectionsUnion.init('detectionsDP',
                                                len(detections))
     for i, detection in enumerate(detections):
-        detec_builder[i].tagIdx = int(detection[0])
+        detec_builder[i].idx = int(detection[0])
         detec_builder[i].xpos = int(detection[1])
         detec_builder[i].ypos = int(detection[2])
         detec_builder[i].xposHive = int(detection[3])
@@ -189,10 +184,10 @@ def build_frame(
 
 
 def build_frame_container(from_ts, to_ts, cam_id,
+                          hive_id=None,
+                          transformation_matrix=None,
                           data_source_fname=None,
                           video_preview_fname=None,
-                          video_first_frame_idx=None,
-                          video_last_frame_idx=None,
                           ):
     """
     Builds a FrameContainer
@@ -217,16 +212,15 @@ def build_frame_container(from_ts, to_ts, cam_id,
     fc.toTimestamp = to_ts
     data_sources = fc.init('dataSources', 1)
     data_source = data_sources[0]
-    cam = data_source.cam
-    cam.camId = cam_id
+    fc.camId = cam_id
+    if hive_id is not None:
+        fc.hiveId = hive_id
+    if transformation_matrix is not None:
+        fc.transformationMatrix = transformation_matrix
     if data_source_fname is not None:
         data_source.filename = data_source_fname
     if video_preview_fname is not None:
         data_source.videoPreviewFilename = video_preview_fname
-    if video_first_frame_idx is not None:
-        data_source.videoFirstFrameIdx = video_first_frame_idx
-    if video_last_frame_idx is not None:
-        data_source.videoFirstFrameIdx = video_last_frame_idx
     return fc
 
 
@@ -284,7 +278,7 @@ class Repository:
         """
         begin = frame_container.fromTimestamp
         end = frame_container.toTimestamp
-        cam_id = get_cam_id(frame_container)
+        cam_id = frame_container.camId
         fname, _ = self._create_file_and_symlinks(begin, end, cam_id, 'bbb')
         with open(fname, 'w') as f:
             frame_container.write(f)

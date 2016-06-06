@@ -46,7 +46,7 @@ def test_bbb_convert_detections_to_numpy():
     frame = Frame.new_message()
     frame.detectionsUnion.init('detectionsDP', 1)
     detection = frame.detectionsUnion.detectionsDP[0]
-    detection.tagIdx = 0
+    detection.idx = 0
     detection.xpos = 344
     detection.ypos = 5498
     detection.zRotation = 0.24
@@ -60,7 +60,7 @@ def test_bbb_convert_detections_to_numpy():
         bits[i] = bit_value
 
     arr = convert_detections_to_numpy(frame)
-    assert arr[0, 0] == detection.tagIdx
+    assert arr[0, 0] == detection.idx
     assert arr[0, 1] == detection.xpos
     assert arr[0, 2] == detection.ypos
     assert arr[0, 3] == detection.yposHive
