@@ -4,8 +4,10 @@ import os
 import numpy as np
 import json
 import math
-import datetime
-from pytz import timezone
+from datetime import datetime, timedelta, timezone
+import iso8601
+
+import pytz
 
 capnp.remove_import_hook()
 _dirname = os.path.dirname(os.path.realpath(__file__))
@@ -17,14 +19,14 @@ DataSource = bbb.DataSource
 DetectionCVP = bbb.DetectionCVP
 DetectionDP = bbb.DetectionDP
 
-_TIMEZONE = timezone('Europe/Berlin')
+_TIMEZONE = pytz.timezone('Europe/Berlin')
 
 
 def get_timezone():
     return _TIMEZONE
 
 
-def parse_image_fname_readable(fname):
+def parse_image_fname_beesbook(fname):
     basename = os.path.basename(fname)
     name = basename.split('.')[0]
     _, camIdxStr, datetimeStr, usStr = name.split('_')
@@ -39,56 +41,97 @@ def parse_image_fname_readable(fname):
     second = int(datetimeStr[12:14])
     us = int(usStr)
 
-    dt = datetime.datetime(year, month, day, hour, minute, second, us)
+    dt = datetime(year, month, day, hour, minute, second, us)
     ts = get_timezone().localize(dt).timestamp()
     return camIdx, ts
 
 
-def parse_image_fname_ts(fname):
+def parse_image_fname_iso(fname):
     basename = os.path.basename(fname)
     name = basename.split('.')[0]
-    _, camIdxStr, ts_str, micros_str = name.split('_')
-    ts = float("{}.{}".format(ts_str, micros_str))
-    return int(camIdxStr), ts
+    _, camIdxStr, iso_str = name.split('_')
+    dt = iso8601.parse_date(iso_str)
+    return int(camIdxStr), dt
 
 
-def parse_image_fname(fname, format='timestamp'):
-    assert format in ['readable', 'timestamp']
-    if format == 'readable':
-        return parse_image_fname_readable(fname)
+def parse_image_fname(fname, format='iso'):
+    assert format in ['beesbook', 'iso']
+    if format == 'beesbook':
+        return parse_image_fname_beesbook(fname)
     else:
-        return parse_image_fname_ts(fname)
+        return parse_image_fname_iso(fname)
 
 
-def parse_video_fname(fname, format='timestamp'):
-    begin_name, end_name = fname.split('_TO_')
-    (camIdx, begin) = parse_image_fname(begin_name, format)
-    (_, end) = parse_image_fname(end_name, format)
-    return camIdx, begin, end
+def parse_video_fname(fname, format='beesbook'):
+    fname = os.path.basename(fname)
+    if format == 'beesbook':
+        begin_name, end_name = fname.split('_TO_')
+        (camIdx, begin) = parse_image_fname(begin_name, format)
+        (_, end) = parse_image_fname(end_name, format)
+        return camIdx, begin, end
+    elif format == 'iso':
+        fname, _ = os.path.splitext(fname)
+        _, camIdx, isotimespan = fname.split('_')
+        start, end = isotimespan.split('--')
+        end = end.rstrip(".bbb")
+        print(start)
+        print(end)
+        return int(camIdx), iso8601.parse_date(start), iso8601.parse_date(end)
+    else:
+        raise ValueError("Unknown format {}.".format(format))
+
+
+def parse_cam_id(fname):
+    fname = os.path.basename(fname)
+    camIdx = fname.split("_")[1]
+    return int(camIdx)
 
 
 def parse_fname(fname):
     fname = os.path.basename(fname)
     try:
-        return parse_video_fname(fname)
+        return parse_video_fname(fname, 'iso')
     except:
-        camIdx, dtime = parse_image_fname(fname)
-        return camIdx, dtime, dtime
+        try:
+            return parse_video_fname(fname, 'beesbook')
+        except:
+            camIdx, dtime = parse_image_fname(fname)
+            return camIdx, dtime, dtime
 
 
-def get_fname(camIdx, ts):
-    assert type(ts) in (int, float)
-    timestamp = str(ts).replace('.', '_')
-    if '_' not in timestamp:
-        timestamp += '_0'
+def to_datetime(t):
+    if type(t) in (int, float):
+        dt = datetime.fromtimestamp(t, tz=timezone.utc)
+        return dt
+    elif type(t) == datetime:
+        return t
+    else:
+        TypeError("Cannot convert {} to datetime".format(t))
+
+
+def dt_to_str(dt):
+    dt = to_datetime(dt)
+    isoformat = "%Y%m%dT%H%M%S"
+
+    dt_str = dt.strftime(isoformat)
+    if dt.microsecond != 0:
+        dt_str += ".{:03d}".format(dt.microsecond // 10**3)
+    if dt.utcoffset().total_seconds() == 0:
+        return dt_str + "Z"
+    else:
+        return dt_str + dt.strftime("%z")
+
+
+def get_fname(camIdx, dt):
+    dt = to_datetime(dt)
     return ("Cam_{cam}_{ts}").format(
                 cam=camIdx,
-                ts=timestamp,
+                ts=dt_to_str(dt)
             )
 
 
 def get_video_fname(camIdx, begin, end):
-    return get_fname(camIdx, begin) + "_TO_" + get_fname(camIdx, end)
+    return get_fname(camIdx, begin) + "--" + dt_to_str(end)
 
 
 def convert_detections_to_numpy(frame):
@@ -238,39 +281,19 @@ class Repository:
 
     _CONFIG_FNAME = '.bbb_repo_config.json'
 
-    def __init__(self, root_dir, breadth_exponents=None):
+    def __init__(self, root_dir, minute_step=20):
         """
         Creates a new repository at `root_dir`.
 
         Args:
             root_dir (str):  Path where the repository is created
-            breadth_exponents (Optional list[int]): defines the breaths of the different levels.
-                The actuall breadth of the level i is `10 ** breadth_exponents[i]`.
-                Default value is `[3, 3, 3, 5]`.
         """
         self.root_dir = root_dir
         if not os.path.exists(self.root_dir):
             os.makedirs(self.root_dir)
-        if breadth_exponents is None:
-            breadth_exponents = [3, 3, 3, 5]
-        self.breadth_exponents = breadth_exponents
+        self.minute_step = minute_step
         if not os.path.exists(self._repo_json_fname()):
             self._save_json()
-
-    @property
-    def nb_levels(self):
-        """the number of directory levels"""
-        # last breaths is the file level
-        return len(self.breadth_exponents) - 1
-
-    @property
-    def max_ts(self):
-        """Returns the maximum possible timestamp"""
-        return 10**sum(self.breadth_exponents) - 1
-
-    def can_contain_ts(self, timestamp):
-        """Can this repository contain the timestamp"""
-        return 0 <= timestamp < self.max_ts
 
     def add(self, frame_container):
         """
@@ -290,25 +313,30 @@ class Repository:
         """
         fnames = self.find(timestamp)
         for fname in fnames:
-            cam_id, _, _ = parse_fname(fname)
-            if cam_id == cam_id:
+            fname_cam_id = parse_cam_id(fname)
+            if cam_id == fname_cam_id:
                 return load_frame_container(fname)
 
     def find(self, ts, cam=None):
         """
         Returns all files that includes detections to the given timestamp `ts`.
         """
-        path = self._path_for_ts(ts)
+        dt = to_datetime(ts)
+        path = self._path_for_dt(dt)
+        print(path)
         try:
             fnames = self._all_files_in(path)
+            print(fnames)
         except FileNotFoundError:
             return []
-        parts = [parse_fname(f) for f in fnames]
+        parts = [self._parse_repo_fname(f) for f in fnames]
+        print(parts)
         if cam is not None:
             parts = list(filter(lambda p: p[0] == cam, parts))
         found_files = []
         for (camId, begin, end), fname in zip(parts, fnames):
-            if begin <= ts < end:
+            print("{} <= {} < {}".format(begin, dt, end))
+            if begin <= dt < end:
                 found_files.append(self._join_with_repo_dir(path, fname))
         return found_files
 
@@ -333,19 +361,19 @@ class Repository:
         if begin is None:
             current_path = self._get_earliest_path()
         else:
-            current_path = self._path_for_ts(begin, abs=True)
+            current_path = self._path_for_dt(begin, abs=True)
 
         if current_path == self.root_dir:
             return
 
         if end is not None:
-            end_dir = self._path_for_ts(end, abs=True)
+            end_dir = self._path_for_dt(end, abs=True)
         else:
             end_dir = self._get_latest_path()
         while True:
             fnames = self._all_files_in(current_path)
             fnames = filter_no_links(current_path, fnames)
-            parts = [parse_fname(f) for f in fnames]
+            parts = [self._parse_repo_fname(f) for f in fnames]
             begin_fnames = [(p[0], p[1], f) for p, f in zip(parts, fnames)]
             if cam is not None:
                 begin_fnames = list(filter(lambda p: p[0] == cam,
@@ -381,23 +409,11 @@ class Repository:
         with open(self._repo_json_fname(), 'w+') as f:
             json.dump(self._to_config(), f)
 
-    def _path_for_ts(self, timestamp, abs=False):
-        assert self.can_contain_ts(timestamp)
-
-        def convert_timestamp_to_path(ts, max_digets):
-            format_str = "{{:0{}d}}".format(max_digets)
-            return format_str.format(ts)
-
-        def split_number(n):
-            for base in self._level_bases():
-                n_d = int(math.floor(n / base))
-                yield n_d
-                n -= n_d * base
-
-        path_pieces = []
-        for t, d in zip(split_number(timestamp), self.breadth_exponents):
-            path_pieces.append(convert_timestamp_to_path(t, d))
-        path = os.path.join(*path_pieces[:-1])
+    def _path_for_dt(self, time, abs=False):
+        dt = to_datetime(time)
+        minutes = math.floor(dt.minute / self.minute_step) * self.minute_step
+        path = "{:04d}/{:02d}/{:02d}/{:02d}/{:02d}".format(
+            dt.year, dt.month, dt.day, dt.hour, minutes)
         if abs:
             return self._join_with_repo_dir(path)
         else:
@@ -423,14 +439,6 @@ class Repository:
     def _get_latest_path(self):
         return self._get_directory(max)
 
-    def _cumsum_directory_breadths(self):
-        return [sum(self.breadth_exponents[i:])
-                for i in range(0, len(self.breadth_exponents))]
-
-    def _level_bases(self):
-        exponents = self._cumsum_directory_breadths()[1:] + [1]
-        return [10**e for e in exponents]
-
     def _join_with_repo_dir(self, *paths):
         return os.path.join(self.root_dir, *paths)
 
@@ -441,39 +449,39 @@ class Repository:
         return [f for f in os.listdir(dirname)
                 if isfile_or_link(os.path.join(dirname, f))]
 
-    def _get_timestamp_from_path(self, path):
-        path_splits = path.split(os.path.sep)[-self.nb_levels:]
-        path_splits = list(map(int, path_splits))
-        ts = 0
-        for base, dir_number in zip(self._level_bases(), path_splits):
-            ts += dir_number * base
-        return ts
+    def _get_time_from_path(self, path):
+        path = path.rstrip('/\\')
+        time_parts_str = path.split('/')[-5:]
+        print(time_parts_str)
+        time_parts = list(map(int, time_parts_str))
+        return datetime(*time_parts, tzinfo=timezone.utc)
 
     def _step_one_directory(self, path, direction='forward'):
-        if type(path) in [int, float]:
-            ts = path
+        if type(path) == str:
+            dt = self._get_time_from_path(path)
         else:
-            ts = self._get_timestamp_from_path(path)
-        offset = 10**self.breadth_exponents[-1]
+            dt = to_datetime(path)
+
+        offset = timedelta(minutes=self.minute_step)
         if direction == 'forward':
-            ts += offset
+            dt += offset
         elif direction == 'backward':
-            ts -= offset
+            dt -= offset
         else:
             raise ValueError("Unknown direction {}.".format(direction))
-        return self._path_for_ts(ts)
+        return self._path_for_dt(dt)
 
     def _step_to_next_directory(self, path, direction='forward'):
         if direction == 'forward':
             end = self._get_latest_path()
-            path_ts = self._get_timestamp_from_path(path)
-            end_ts = self._get_timestamp_from_path(end)
-            assert path_ts < end_ts
+            path_dt = self._get_time_from_path(path)
+            end_dt = self._get_time_from_path(end)
+            assert path_dt < end_dt
 
         elif direction == 'backward':
             begin = self._get_earliest_path()
-            assert self._get_timestamp_from_path(begin) < \
-                self._get_timestamp_from_path(path)
+            assert self._get_time_from_path(begin) < \
+                self._get_time_from_path(path)
         else:
             raise ValueError("Unknown direction {}.".format(direction))
         current_path = path
@@ -482,20 +490,23 @@ class Repository:
             if os.path.exists(self._join_with_repo_dir(current_path)):
                 return current_path
 
-    def _create_file_and_symlinks(self, begin_ts, end_ts, cam_id,
+    def _create_file_and_symlinks(self, begin, end, cam_id,
                                   extension=''):
-        def spans_multiple_directories(first_ts, end_ts):
-            return self._path_for_ts(first_ts) != \
-                self._path_for_ts(end_ts)
-        fname = self._get_filename(begin_ts, end_ts, cam_id, extension)
+        begin_dt = to_datetime(begin)
+        end_dt = to_datetime(end)
+
+        def spans_multiple_directories(first_ts, end_dt):
+            return self._path_for_dt(first_ts) != \
+                self._path_for_dt(end_dt)
+        fname = self._get_filename(begin_dt, end_dt, cam_id, extension)
         os.makedirs(os.path.dirname(fname), exist_ok=True)
         if not os.path.exists(fname):
             open(fname, 'a').close()
-        iter_ts = end_ts
+        iter_ts = end
         symlinks = []
-        while spans_multiple_directories(begin_ts, iter_ts):
-            path = self._path_for_ts(iter_ts)
-            link_fname = self._get_filename(begin_ts, end_ts, cam_id,
+        while spans_multiple_directories(begin_dt, iter_ts):
+            path = self._path_for_dt(iter_ts)
+            link_fname = self._get_filename(begin_dt, end, cam_id,
                                             extension, path)
             symlinks.append(link_fname)
             link_dir = os.path.dirname(link_fname)
@@ -503,16 +514,16 @@ class Repository:
             rel_goal = os.path.relpath(fname, start=link_dir)
             os.symlink(rel_goal, link_fname)
             iter_path = self._step_one_directory(iter_ts, 'backward')
-            iter_ts = self._get_timestamp_from_path(iter_path)
+            iter_ts = self._get_time_from_path(iter_path)
         return fname, symlinks
 
-    def _get_filename(self, begin_ts, end_ts, cam_id, extension='', path=None):
+    def _get_filename(self, begin_dt, end_dt, cam_id, extension='', path=None):
         assert type(cam_id) is int
         assert type(path) is str or path is None
 
         if path is None:
-            path = self._path_for_ts(begin_ts)
-        basename = get_video_fname(cam_id, begin_ts, end_ts)
+            path = self._path_for_dt(begin_dt)
+        basename = get_video_fname(cam_id, begin_dt, end_dt)
         if extension != '':
             basename += '.' + extension
         return self._join_with_repo_dir(path, basename)
@@ -523,5 +534,12 @@ class Repository:
     def _to_config(self):
         return {
             'root_dir': self.root_dir,
-            'breadth_exponents': self.breadth_exponents,
+            'minute_step': self.minute_step,
         }
+
+    @staticmethod
+    def _parse_repo_fname(fname):
+        try:
+            return parse_video_fname(fname, format='iso')
+        except:
+            return parse_image_fname_iso(fname)

@@ -15,7 +15,7 @@ import shutil
 @pytest.fixture
 def example_experiment_repo(request):
     tmpdir = tempfile.mkdtemp(prefix=os.path.dirname(__file__) + "_tmpdir_")
-    repo = Repository(tmpdir, breadth_exponents=[2]*4 + [3])
+    repo = Repository(tmpdir)
     experiment_duration = 6*7*24*3600
     one_video = int(1024 / 3)
     begin = int(time.time())

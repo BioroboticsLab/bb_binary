@@ -1,18 +1,23 @@
 
 from conftest import fill_repository
 from bb_binary import build_frame_container, parse_video_fname, Frame, \
-    Repository, convert_detections_to_numpy, build_frame
+    Repository, convert_detections_to_numpy, build_frame, dt_to_str
 
 import time
-import datetime
+from datetime import datetime, timezone
 import numpy as np
-import pytest
 import os
+import math
 
 
 def test_bbb_is_loaded():
     frame = Frame.new_message()
     assert hasattr(frame, 'timestamp')
+
+
+def test_dt_to_str():
+    dt = datetime(2015, 8, 15, 12, 0, 40, 333967, tzinfo=timezone.utc)
+    assert dt_to_str(dt) == "20150815T120040.333Z"
 
 
 def test_bbb_frame_from_detections():
@@ -82,49 +87,38 @@ def test_bbb_repo_save_json(tmpdir):
 
 
 def test_bbb_repo_path_for_ts(tmpdir):
-    repo = Repository(str(tmpdir), breadth_exponents=[2]*4)
-    path = repo._path_for_ts(3000)
-    assert path == '00/00/30'
+    repo = Repository(str(tmpdir))
+    path = repo._path_for_dt(datetime(1970, 1, 20, 8, 25))
+    assert path == '1970/01/20/08/20'
 
-    repo = Repository(str(tmpdir), breadth_exponents=[3]*4)
+    repo = Repository(str(tmpdir))
 
-    path = repo._path_for_ts(58000)
-    assert path == '000/000/058'
+    path = repo._path_for_dt(datetime(2012, 2, 29, 8, 55))
+    assert path == '2012/02/29/08/40'
 
-    path = repo._path_for_ts(99014358000)
-    assert path == '099/014/358'
-
-    path = repo._path_for_ts(14358000)
-    assert path == '000/014/358'
-
-    now = int(time.time())
-    path = repo._path_for_ts(now)
-    now = str(now)
-    path = path.split(os.path.sep)
-    assert path[-1] == now[-6:-3]
-    assert path[-2] == now[-9:-6]
-
-    path = repo._path_for_ts(repo.max_ts - 1)
-    assert path == '999/999/999'
-
-    with pytest.raises(AssertionError):
-        repo._path_for_ts(repo.max_ts)
+    now = datetime.now(timezone.utc)
+    print(now.utcoffset())
+    path = repo._path_for_dt(now)
+    expected_minutes = math.floor(now.minute / repo.minute_step) * repo.minute_step
+    expected_dt = now.replace(minute=expected_minutes, second=0, microsecond=0)
+    print(expected_dt.utcoffset())
+    assert repo._get_time_from_path(path) == expected_dt
 
 
 def test_bbb_repo_get_ts_from_path(tmpdir):
-    repo = Repository(str(tmpdir), breadth_exponents=[2]*4)
+    repo = Repository(str(tmpdir))
 
-    path = '00/10/01'
-    assert repo._get_timestamp_from_path(path) == 100100
+    path = '1800/10/01/00/00'
+    assert repo._get_time_from_path(path) == datetime(1800, 10, 1, 0, 0, tzinfo=timezone.utc)
 
-    path = '50/10/99'
-    assert repo._get_timestamp_from_path(path) == 50109900
+    path = '2017/10/15/23/40'
+    assert repo._get_time_from_path(path) == datetime(2017, 10, 15, 23, 40, tzinfo=timezone.utc)
 
     # test inverse to path_for_ts
-    ts = 3000
-    path = repo._path_for_ts(ts)
-    assert path == '00/00/30'
-    assert repo._get_timestamp_from_path(path) == ts
+    dt = datetime(2017, 10, 15, 23, repo.minute_step, tzinfo=timezone.utc)
+    path = repo._path_for_dt(dt)
+    assert path == '2017/10/15/23/{:02d}'.format(repo.minute_step)
+    assert repo._get_time_from_path(path) == dt
 
 
 def find_and_assert_begin(repo, timestamp, expect_begin, nb_files_found=1):
@@ -141,30 +135,22 @@ def find_and_assert_begin(repo, timestamp, expect_begin, nb_files_found=1):
 
 
 def test_bbb_repo_find_single_file_per_timestamp(tmpdir):
-    repo = Repository(str(tmpdir), breadth_exponents=[3]*3 + [3])
-    span = 500
+    repo = Repository(str(tmpdir))
+    span = 60*10
     begin_end_cam_id = [(ts, ts + span, 0) for ts in range(0, 100000, span)]
 
     fill_repository(repo, begin_end_cam_id)
 
-    find_and_assert_begin(repo, 0, expect_begin=0)
-    find_and_assert_begin(repo, 50, expect_begin=0)
-    find_and_assert_begin(repo, 500, expect_begin=500)
-    find_and_assert_begin(repo, 650, expect_begin=500)
-    find_and_assert_begin(repo, 999, expect_begin=500)
-    find_and_assert_begin(repo, 1000, expect_begin=1000)
-
-    with pytest.raises(AssertionError):
-        find_and_assert_begin(repo, 50000, 50)
+    assert repo.find(0)[0] == repo._get_filename(0, span, 0, 'bbb')
+    assert repo.find(60*10)[0] == repo._get_filename(60*10, 60*10+span, 0, 'bbb')
+    assert repo.find(1000000) == []
 
 
 def test_bbb_repo_iter_fnames(tmpdir):
-    repo = Repository(str(tmpdir.join('empty')),
-                      breadth_exponents=[3]*3 + [3])
+    repo = Repository(str(tmpdir.join('empty')))
     assert list(repo.iter_fnames()) == []
 
-    repo = Repository(str(tmpdir.join('2_files_and_1_symlink_per_directory')),
-                      breadth_exponents=[3]*3 + [3])
+    repo = Repository(str(tmpdir.join('2_files_and_1_symlink_per_directory')))
     span = 500
     begin_end_cam_id = [(ts, ts + span + 100, 0) for ts in range(0, 10000, span)]
 
@@ -175,8 +161,7 @@ def test_bbb_repo_iter_fnames(tmpdir):
         repo._get_filename(*p, extension='bbb')) for p in begin_end_cam_id]
     assert fnames == expected_fnames
 
-    repo = Repository(str(tmpdir.join('missing_directories')),
-                      breadth_exponents=[3]*3 + [3])
+    repo = Repository(str(tmpdir.join('missing_directories')))
     span = 1500
     begin_end_cam_id = [(ts, ts + span, 0)
                         for ts in range(0, 10000, span)]
@@ -190,8 +175,7 @@ def test_bbb_repo_iter_fnames(tmpdir):
         repo._get_filename(*p, extension='bbb')) for p in begin_end_cam_id]
     assert fbasenames == expected_fnames
 
-    repo = Repository(str(tmpdir.join('complex_from_to')),
-                      breadth_exponents=[3]*3 + [3])
+    repo = Repository(str(tmpdir.join('complex_from_to')))
     span = 1500
     begin_end_cam_id = [(ts, ts + span, 0)
                         for ts in range(0, 10000, span)]
@@ -210,8 +194,7 @@ def test_bbb_repo_iter_fnames(tmpdir):
                        for p in slice_begin_end_cam_id]
     assert fbasenames == expected_fnames
 
-    repo = Repository(str(tmpdir.join('complex_from_to_and_cam')),
-                      breadth_exponents=[3]*3 + [3])
+    repo = Repository(str(tmpdir.join('complex_from_to_and_cam')))
     span = 1500
     begin_end_cam_id0 = [(ts, ts + span, 0) for ts in range(0, 10000, span)]
     begin_end_cam_id1 = [(ts, ts + span, 1) for ts in range(0, 10000, span)]
@@ -236,7 +219,7 @@ def test_bbb_repo_iter_fnames(tmpdir):
 
 
 def test_bbb_repo_find_multiple_file_per_timestamp(tmpdir):
-    repo = Repository(str(tmpdir), breadth_exponents=[3]*3 + [3])
+    repo = Repository(str(tmpdir))
     span = 500
     begin = 1000
     end = 100000
@@ -254,8 +237,8 @@ def test_bbb_repo_find_multiple_file_per_timestamp(tmpdir):
 
 
 def test_bbb_create_symlinks(tmpdir):
-    repo = Repository(str(tmpdir), breadth_exponents=[3]*3 + [3])
-    fname, symlinks = repo._create_file_and_symlinks(0, 2000, 0, 'bbb')
+    repo = Repository(str(tmpdir))
+    fname, symlinks = repo._create_file_and_symlinks(0, 60*repo.minute_step*2 + 10, 0, 'bbb')
     with open(fname, 'w') as f:
         f.write("hello world!")
     assert len(symlinks) == 2
@@ -264,15 +247,15 @@ def test_bbb_create_symlinks(tmpdir):
         with open(symlink) as f:
             assert f.read() == "hello world!"
 
-    _, symlinks = repo._create_file_and_symlinks(1045, 4567, 0, 'bbb')
+    _, symlinks = repo._create_file_and_symlinks(1045, 1045 + 60*repo.minute_step*3 + 5, 0, 'bbb')
     assert len(symlinks) == 3
 
-    _, symlinks = repo._create_file_and_symlinks(1045, 1999, 0, 'bbb')
+    _, symlinks = repo._create_file_and_symlinks(1045, 1045 + repo.minute_step // 2, 0, 'bbb')
     assert len(symlinks) == 0
 
 
 def test_bbb_repo_add_frame_container(tmpdir):
-    repo = Repository(str(tmpdir), breadth_exponents=[3]*3 + [3])
+    repo = Repository(str(tmpdir))
     cam_id = 1
     fc = build_frame_container(1000, 5000, 1)
 
@@ -291,7 +274,7 @@ def test_bbb_repo_add_frame_container(tmpdir):
 
 
 def test_bbb_repo_open_frame_container(tmpdir):
-    repo = Repository(str(tmpdir), breadth_exponents=[3]*3 + [3])
+    repo = Repository(str(tmpdir))
     cam_id = 1
     fc = build_frame_container(1000, 5000, cam_id)
 
@@ -303,18 +286,19 @@ def test_bbb_repo_open_frame_container(tmpdir):
 
 def test_parse_video_fname():
     fname = "Cam_1_20160501160208_958365_TO_Cam_1_20160501160748_811495.avi"
-    camIdx, begin, end = parse_video_fname(fname, format='readable')
-    begin_dt = datetime.datetime.fromtimestamp(begin)
+    camIdx, begin, end = parse_video_fname(fname, format='beesbook')
+    begin_dt = datetime.fromtimestamp(begin)
     assert camIdx == 1
     assert begin_dt.year == 2016
 
-    fname = "Cam_1_20160501160208_0_TO_Cam_1_20160501160748_0.bb"
-    camIdx, begin, end = parse_video_fname(fname, format='readable')
-    begin_dt = datetime.datetime.fromtimestamp(begin)
+    fname = "Cam_1_20160501160208_0_TO_Cam_1_20160501160748_0.bbb"
+    camIdx, begin, end = parse_video_fname(fname, format='beesbook')
+    begin_dt = datetime.fromtimestamp(begin)
     assert camIdx == 1
     assert begin_dt.year == 2016
     assert begin_dt.month == 5
 
-    fname = "Cam_1_20160501160208_0_TO_Cam_1_20160501160748_0.bb"
-    camIdx, begin, end = parse_video_fname(fname, format='timestamp')
-    assert begin == 20160501160208
+    fname = "Cam_0_19700101T001000.000000Z--19700101T002000.000000Z.bbb"
+    camIdx, begin, end = parse_video_fname(fname, format='iso')
+    assert begin == datetime.fromtimestamp(10*60, tz=timezone.utc)
+    assert end == datetime.fromtimestamp(20*60, tz=timezone.utc)
