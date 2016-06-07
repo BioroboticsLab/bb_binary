@@ -6,8 +6,8 @@ import json
 import math
 from datetime import datetime, timedelta, timezone
 import iso8601
-
 import pytz
+
 
 capnp.remove_import_hook()
 _dirname = os.path.dirname(os.path.realpath(__file__))
@@ -288,7 +288,7 @@ class Repository:
         Args:
             root_dir (str):  Path where the repository is created
         """
-        self.root_dir = root_dir
+        self.root_dir = os.path.abspath(root_dir)
         if not os.path.exists(self.root_dir):
             os.makedirs(self.root_dir)
         self.minute_step = minute_step
@@ -400,6 +400,7 @@ class Repository:
             format(directory, config_fname)
         with open(config_fname) as f:
             config = json.load(f)
+        config['root_dir'] = directory
         return Repository(**config)
 
     def __eq__(self, other):

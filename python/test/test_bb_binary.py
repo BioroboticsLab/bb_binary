@@ -15,6 +15,11 @@ def test_bbb_is_loaded():
     assert hasattr(frame, 'timestamp')
 
 
+def test_bbb_relative_path():
+    repo = Repository("test_repo")
+    assert os.path.isabs(repo.root_dir)
+
+
 def test_dt_to_str():
     dt = datetime(2015, 8, 15, 12, 0, 40, 333967, tzinfo=timezone.utc)
     assert dt_to_str(dt) == "20150815T120040.333Z"
