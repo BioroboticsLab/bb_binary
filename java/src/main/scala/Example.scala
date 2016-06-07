@@ -1,10 +1,12 @@
 package de.fuberlin.biorobotics.test
 
-import org.apache.log4j.Logger
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.sql.SQLContext
 import scala.io.Source
+import scala.collection.JavaConverters._
 
+import org.capnproto.{MessageReader, PackedInputStream, SerializePacked, Serialize}
+import de.fuberlin.biorobotics.BeesBook.{FrameContainer, Frame, DetectionDP}
 
 case class Detection(
     tagIdx       : Int,    // unique sequential id of the tag
@@ -37,6 +39,20 @@ object ExampleClass extends Serializable {
       row(9).toFloat,
       row(10).toFloat,
       Integer.parseInt(row(11), 2))
+  }
+  def load_capnp(fname: String): Seq[Detection] = {
+    val message = Serialize.read(new java.io.FileInputStream(fname).getChannel)
+    val fc = message.getRoot(FrameContainer.factory)
+    val frames = fc.getFrames
+    val frame: Frame.Reader = frames.get(0)
+    val detections = frame.getDetectionsUnion.getDetectionsDP
+    for(d: DetectionDP.Reader <- detections.asScala) {
+      println(d.getIdx)
+      println(d.getXRotation)
+      println(d.getYRotation)
+      println(d.getDecodedId)
+    }
+    return Seq()
   }
 
   def load_csv(fname: String): Seq[Detection] = {

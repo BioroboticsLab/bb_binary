@@ -1,8 +1,7 @@
 name := "Sca" // change to project name
 organization := "de.fuberlin.mi.biorobotics" // change to your org
 version := "0.1"
-scalaVersion := "2.10.5"
-// Databricks uses 2.10.5 (as of 02/12/2016)
+scalaVersion := "2.11.8"
 
 libraryDependencies ++= Seq(
   // spark core
