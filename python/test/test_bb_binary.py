@@ -69,18 +69,23 @@ def test_bbb_convert_detections_to_numpy():
     for i in range(nb_bits):
         bits[i] = bit_value
 
-    arr = convert_detections_to_numpy(frame)
-    assert arr[0, 0] == detection.idx
-    assert arr[0, 1] == detection.xpos
-    assert arr[0, 2] == detection.ypos
-    assert arr[0, 3] == detection.yposHive
-    assert arr[0, 4] == detection.yposHive
-    assert arr[0, 5] == detection.zRotation
-    assert arr[0, 6] == detection.yRotation
-    assert arr[0, 7] == detection.xRotation
-    assert arr[0, 8] == detection.radius
-    assert np.allclose(arr[0, 9:], np.array([bit_value / 255] * nb_bits),
-                       atol=0.5/255)
+    expectedKeys = ('idx', 'xpos', 'ypos', 'xRotation', 'yRotation',
+                    'zRotation', 'radius', 'decodedId')
+    excludedKeys = ('localizerSaliency', 'xposHive', 'yposHive')
+    arr = convert_detections_to_numpy(frame, excludedKeys)
+
+    # check if we have all the expected keys in the array (and only these)
+    assert len(expectedKeys) == len(arr.dtype.names)
+    assert set(expectedKeys) == set(arr.dtype.names)
+
+    # check if the values are as expected
+    for key in expectedKeys:
+        if key == 'decodedId':
+            assert np.allclose(arr[key],
+                               np.array([bit_value / 255] * nb_bits),
+                               atol=0.5/255)
+        else:
+            assert arr[key][0] == getattr(detection, key)
 
 
 def test_bbb_repo_save_json(tmpdir):

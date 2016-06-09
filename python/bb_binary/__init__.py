@@ -134,30 +134,38 @@ def get_video_fname(camIdx, begin, end):
     return get_fname(camIdx, begin) + "--" + dt_to_str(end)
 
 
-def convert_detections_to_numpy(frame):
+def convert_detections_to_numpy(frame, excludedKeys=[]):
     """
     Returns the detections as a numpy array from the frame.
-    """
 
+    Args:
+        frame (Frame): datastructure with frame data from capnp.
+        excludedKeys (Optional list): keys that are not converted to np array
+    """
     union_type = frame.detectionsUnion.which()
     assert union_type == 'detectionsDP', \
         "Currently only the new pipeline format is supported."
-    detections = frame.detectionsUnion.detectionsDP
 
-    nb_bits = len(detections[0].decodedId)
-    shape = (len(detections), nb_parameters(nb_bits))
-    arr = np.zeros(shape, dtype=np.float32)
+    detections = frame.detectionsUnion.detectionsDP
+    detection0 = detections[0].to_dict()
+    # automatically deduce keys and types except for decodedId
+    keys = [key for key in list(detection0.keys())
+            if key not in excludedKeys]
+    formats = [type(detection0[key]) for key in keys]
+    decoded_id_key = "decodedId"
+    # special handling of decodedId as float array
+    if decoded_id_key not in excludedKeys:
+        decoded_id_index = keys.index(decoded_id_key)
+        formats[decoded_id_index] = str(len(detection0[decoded_id_key])) + 'f8'
+
+    arr = np.zeros(len(detections), dtype={'names': keys, 'formats': formats})
     for i, detection in enumerate(detections):
-        arr[i, 0] = detection.idx
-        arr[i, 1] = detection.xpos
-        arr[i, 2] = detection.ypos
-        arr[i, 3] = detection.xposHive
-        arr[i, 4] = detection.yposHive
-        arr[i, 5] = detection.zRotation
-        arr[i, 6] = detection.yRotation
-        arr[i, 7] = detection.xRotation
-        arr[i, 8] = detection.radius
-        arr[i, 9:] = np.array(list(detection.decodedId)) / 255.
+        # make sure we have the same order as in keys
+        val = [getattr(detection, key) for key in keys]
+        if decoded_id_key not in excludedKeys:
+            val[decoded_id_index] = np.array(val[decoded_id_index]) / 255.
+        # structured np arrays only accept tuples
+        arr[i] = tuple(val)
 
     return arr
 
