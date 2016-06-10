@@ -136,8 +136,7 @@ def get_video_fname(camIdx, begin, end):
 
 
 def convert_frame_to_numpy(frame, excluded_keys=None):
-    """
-    Returns the frame data and detections as a numpy array from the frame.
+    """Returns the frame data and detections as a numpy array from the frame.
 
     Note: the frame id is identified in the array as frameId instead of id!
 
@@ -147,15 +146,17 @@ def convert_frame_to_numpy(frame, excluded_keys=None):
     """
     excluded_keys = excluded_keys or []
 
-    union_type = frame.detectionsUnion.which()
-    assert union_type == 'detectionsDP', \
-        "Currently only the new pipeline format is supported."
-
     frame_arr = _convert_frame_to_numpy(frame, excluded_keys)
     detection_arr = None
 
-    if "detectionsUnion" not in excluded_keys:
-        detections = frame.detectionsUnion.detectionsDP
+    if 'detectionsUnion' not in excluded_keys:
+        union_type = frame.detectionsUnion.which()
+        if union_type == 'detectionsDP':
+            detections = frame.detectionsUnion.detectionsDP
+        elif union_type == 'detectionsCVP':
+            detections = frame.detectionsUnion.detectionsCVP
+        else:
+            raise KeyError("Type {0} not supported.".format(union_type))
         detection_arr = _convert_detections_to_numpy(detections, excluded_keys)
 
     if frame_arr is None:
@@ -170,8 +171,7 @@ def convert_frame_to_numpy(frame, excluded_keys=None):
 
 
 def _convert_frame_to_numpy(frame, excluded_keys=None):
-    """
-    Helper function for `convert_frame_to_numpy(frame, excluded_keys)`.
+    """Helper function for `convert_frame_to_numpy(frame, excluded_keys)`.
 
     Converts the frame data to a numpy array.
     """
@@ -200,8 +200,7 @@ def _convert_frame_to_numpy(frame, excluded_keys=None):
 
 
 def _convert_detections_to_numpy(detections, excluded_keys=None):
-    """
-    Helper function for `convert_frame_to_numpy(frame, excluded_keys)`.
+    """Helper function for `convert_frame_to_numpy(frame, excluded_keys)`.
 
     Converts the detections data to a numpy array.
     """
@@ -220,8 +219,9 @@ def _convert_detections_to_numpy(detections, excluded_keys=None):
     formats = [type(detection0[key]) for key in keys]
 
     decoded_id_key = "decodedId"
-    # special handling of decodedId as float array
-    if decoded_id_key not in excluded_keys:
+    decoded_id_index = None
+    # special handling of decodedId as float array in CP pipeline data
+    if decoded_id_key in keys and isinstance(detection0[decoded_id_key], list):
         decoded_id_index = keys.index(decoded_id_key)
         formats[decoded_id_index] = str(len(detection0[decoded_id_key])) + 'f8'
 
@@ -229,12 +229,24 @@ def _convert_detections_to_numpy(detections, excluded_keys=None):
     for i, detection in enumerate(detections):
         # make sure we have the same order as in keys
         val = [getattr(detection, key) for key in keys]
-        if decoded_id_key not in excluded_keys:
+        if decoded_id_index is not None:
             val[decoded_id_index] = np.array(val[decoded_id_index]) / 255.
         # structured np arrays only accept tuples
         detection_arr[i] = tuple(val)
 
     return detection_arr
+
+
+def get_detections(frame):
+    """Extracts detections of CP or CVP from frame."""
+    union_type = frame.detectionsUnion.which()
+    if union_type == 'detectionsDP':
+        detections = frame.detectionsUnion.detectionsDP
+    elif union_type == 'detectionsCVP':
+        detections = frame.detectionsUnion.detectionsCVP
+    else:
+        raise KeyError("Type {0} not supported.".format(union_type))
+    return detections
 
 
 def nb_parameters(nb_bits):

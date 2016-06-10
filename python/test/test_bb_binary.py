@@ -2,7 +2,7 @@
 from conftest import fill_repository
 from bb_binary import build_frame_container, parse_video_fname, Frame, \
     Repository,  build_frame, dt_to_str, convert_frame_to_numpy, \
-    _convert_detections_to_numpy, _convert_frame_to_numpy
+    _convert_detections_to_numpy, _convert_frame_to_numpy, get_detections
 
 import time
 from datetime import datetime, timezone
@@ -55,114 +55,161 @@ def test_bbb_frame_from_detections():
 
 
 @pytest.fixture
-def example_frame_data():
+def frame_data():
+    """Frame without detections."""
     frame = Frame.new_message()
     frame.id = 1
     frame.dataSourceIdx = 1
     frame.timedelta = 150
     frame.timestamp = 1465290180
 
-    frame.detectionsUnion.init('detectionsDP', 1)
-    detection = frame.detectionsUnion.detectionsDP[0]
-    detection.idx = 0
-    detection.xpos = 344
-    detection.ypos = 5498
-    detection.zRotation = 0.24
-    detection.yRotation = 0.1
-    detection.xRotation = -0.14
-    detection.radius = 23
-    nb_bits = 12
-    bits = detection.init('decodedId', nb_bits)
-    bit_value = nb_bits * 2
-    for i in range(nb_bits):
-        bits[i] = bit_value
+    return frame
+
+
+@pytest.fixture
+def frame_dp_data(frame_data):
+    """Frame with detections in new pipeline format."""
+    frame = frame_data.copy()
+    frame.detectionsUnion.init('detectionsDP', 3)
+    # TODO: hivepos and more detections
+    for i in range(0, 3):
+        detection = frame.detectionsUnion.detectionsDP[i]
+        detection.idx = i
+        detection.xpos = 344 + 10 * i
+        detection.ypos = 5498 + 10 * i
+        detection.zRotation = 0.24 + 0.1 * i
+        detection.yRotation = 0.1 + 0.1 * i
+        detection.xRotation = -0.14 - 0.1 * i
+        detection.radius = 22 + i
+        nb_bits = 12
+        bits = detection.init('decodedId', nb_bits)
+        bit_value = nb_bits * (1+i)
+        for i in range(nb_bits):
+            bits[i] = bit_value
 
     return frame
 
 
-def test_bbb_convert_detections_to_numpy(example_frame_data):
-    """
-    Tests that detections are correctly converted to numpy array
-    and frame data is ignored.
-    """
-    frame = example_frame_data
+@pytest.fixture
+def frame_cvp_data(frame_data):
+    """Frame with detections in old pipeline format."""
+    frame = frame_data.copy()
+    frame.detectionsUnion.init('detectionsCVP', 3)
+    # TODO: hivepos and scores
+    for i in range(0, 3):
+        detection = frame.detectionsUnion.detectionsCVP[i]
+        detection.idx = i
+        detection.candidateIdx = 0  # or is it *i* and *0* for *gridIdx*?
+        detection.gridIdx = i
+        detection.xpos = 344
+        detection.ypos = 5498
+        detection.zRotation = 0.24
+        detection.yRotation = 0.1
+        detection.xRotation = -0.14
+        detection.decodedId = 2015 + i
 
+    return frame
+
+
+def test_bbb_convert_detections_to_numpy(frame_dp_data):
+    """Detections are correctly converted to np array and frame is ignored."""
+    frame = frame_dp_data
     expected_keys = ['idx', 'xpos', 'ypos', 'xRotation', 'yRotation',
                      'zRotation', 'radius', 'decodedId']
-    excludedKeys = ['localizerSaliency', 'xposHive', 'yposHive']
+    excluded_keys = ['localizerSaliency', 'xposHive', 'yposHive']
 
     detections = frame.detectionsUnion.detectionsDP
-    arr = _convert_detections_to_numpy(detections, excludedKeys)
+    arr = _convert_detections_to_numpy(detections, excluded_keys)
     bbb_check_frame_data(frame, arr, expected_keys)
 
 
-def test_bbb_convert_frame_to_numpy(example_frame_data):
-    """
-    Tests that frame data is correctly converted to numpy array
-    and detections are ignored.
-    """
-    frame = example_frame_data
+def test_bbb_convert_frame_to_numpy(frame_dp_data):
+    """Frame is correctly converted to np array and detections are ignored."""
+    frame = frame_dp_data
 
     expected_keys = ['frameId', 'timedelta', 'timestamp']
-    excludedKeys = ['dataSourceIdx']
+    excluded_keys = ['dataSourceIdx']
 
-    arr = _convert_frame_to_numpy(frame, excludedKeys)
+    arr = _convert_frame_to_numpy(frame, excluded_keys)
     bbb_check_frame_data(frame, arr, expected_keys)
 
 
-def test_bbb_convert_only_frame_to_numpy(example_frame_data):
-    """
-    Tests that frame data is correctly converted to numpy array
-    and detections are ignored.
-    """
-    frame = example_frame_data
+def test_bbb_convert_only_frame_to_numpy(frame_dp_data):
+    """Frame is correctly converted to np array and detections are ignored."""
+    frame = frame_dp_data
 
     expected_keys = ['frameId', 'timedelta', 'timestamp']
-    excludedKeys = ['dataSourceIdx', 'detectionsUnion']
+    excluded_keys = ['dataSourceIdx', 'detectionsUnion']
 
-    arr = _convert_frame_to_numpy(frame, excludedKeys)
+    arr = _convert_frame_to_numpy(frame, excluded_keys)
     bbb_check_frame_data(frame, arr, expected_keys)
 
 
-def test_bbb_convert_frame_and_detections_to_numpy(example_frame_data):
-    """
-    Tests that frame data and detections are correctly converted to np array.
-    """
-    frame = example_frame_data
+def test_bbb_convert_frame_and_detections_dp_to_numpy(frame_dp_data):
+    """Frame and detections (dp) are correctly converted to np array."""
+    frame = frame_dp_data
 
     expected_keys = ['frameId', 'timedelta', 'timestamp',
                      'idx', 'xpos', 'ypos', 'xRotation', 'yRotation',
                      'zRotation', 'radius', 'decodedId']
-    excludedKeys = ['dataSourceIdx', 'localizerSaliency',
-                    'xposHive', 'yposHive']
+    excluded_keys = ['dataSourceIdx', 'localizerSaliency',
+                     'xposHive', 'yposHive']
 
-    arr = convert_frame_to_numpy(frame, excludedKeys)
+    arr = convert_frame_to_numpy(frame, excluded_keys)
+    bbb_check_frame_data(frame, arr, expected_keys)
+
+
+def test_bbb_convert_frame_and_detections_cvp_to_numpy(frame_cvp_data):
+    """Frame and detections (cvp) are correctly converted to np array."""
+    frame = frame_cvp_data
+
+    expected_keys = ['frameId', 'timedelta', 'timestamp',
+                     'idx', 'xpos', 'ypos', 'xRotation', 'yRotation',
+                     'zRotation', 'candidateIdx', 'gridIdx', 'decodedId']
+    excluded_keys = ['dataSourceIdx', 'lScore', 'eScore', 'gScore',
+                     'xposHive', 'yposHive']
+
+    arr = convert_frame_to_numpy(frame, excluded_keys)
     bbb_check_frame_data(frame, arr, expected_keys)
 
 
 def bbb_check_frame_data(frame, arr, expected_keys):
-    """
-    Helper to compare frame data to numpy array.
-    """
+    """Helper to compare frame data to numpy array."""
     # check if we have all the expected keys in the array (and only these)
     assert set(expected_keys) == set(arr.dtype.names)
     assert len(expected_keys) == len(arr.dtype.names)
 
-    detection = frame.detectionsUnion.detectionsDP[0]
+    detections = get_detections(frame)
+    for i, detection in enumerate(detections):
+        # check if the values are as expected
+        for key in expected_keys:
+            if key == 'decodedId' and \
+               frame.detectionsUnion.which() == 'detectionsDP':
+                assert np.allclose(arr[key][i],
+                                   np.array([detection.decodedId[0] / 255] *
+                                            len(detection.decodedId)),
+                                   atol=0.5/255)
+            elif key == 'frameId':
+                assert np.all(arr[key] == getattr(frame, 'id'))
+            elif hasattr(frame, key):
+                # all detections are from the same frame
+                # so we expect the whole column to have the same value.
+                assert np.all(arr[key] == getattr(frame, key))
+            else:
+                assert arr[key][i] == getattr(detection, key)
 
-    # check if the values are as expected
-    for key in expected_keys:
-        if key == 'decodedId':
-            assert np.allclose(arr[key],
-                               np.array([detection.decodedId[0] / 255] *
-                                        len(detection.decodedId)),
-                               atol=0.5/255)
-        elif key == 'frameId':
-            assert arr[key] == getattr(frame, "id")
-        elif hasattr(frame, key):
-            assert arr[key] == getattr(frame, key)
-        else:
-            assert arr[key][0] == getattr(detection, key)
+
+def test_bbb_get_detections(frame_data, frame_dp_data, frame_cvp_data):
+    """Extracts correct detections from old and new pipeline data."""
+    diffKey = 'candidateIdx'
+    detections = get_detections(frame_dp_data)
+    assert not hasattr(detections[0], diffKey)
+
+    detections = get_detections(frame_cvp_data)
+    assert hasattr(detections[0], diffKey)
+
+    # Important note: the default value for detectionsUnion is detectionsCVP
+    assert frame_data.detectionsUnion.which() == 'detectionsCVP'
 
 
 def test_bbb_repo_save_json(tmpdir):
