@@ -1,13 +1,15 @@
 
 import capnp
 import os
+import errno
 import numpy as np
 import numpy.lib.recfunctions as rf
 import json
 import math
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 import iso8601
 import pytz
+import six
 
 
 capnp.remove_import_hook()
@@ -27,6 +29,25 @@ def get_timezone():
     return _TIMEZONE
 
 
+def to_timestamp(dt):
+    try:
+        return dt.timestamp()
+    except AttributeError:  # python 2
+        utc_naive = dt.replace(tzinfo=None) - dt.utcoffset()
+        timestamp = (utc_naive - datetime(1970, 1, 1)).total_seconds()
+        return timestamp
+
+
+def mkdir_p(path):
+    try:
+        os.makedirs(path)
+    except OSError as exc:  # Python >2.5
+        if exc.errno == errno.EEXIST and os.path.isdir(path):
+            pass
+        else:
+            raise
+
+
 def parse_image_fname_beesbook(fname):
     basename = os.path.basename(fname)
     name = basename.split('.')[0]
@@ -43,7 +64,7 @@ def parse_image_fname_beesbook(fname):
     us = int(usStr)
 
     dt = datetime(year, month, day, hour, minute, second, us)
-    ts = get_timezone().localize(dt).timestamp()
+    ts = to_timestamp(get_timezone().localize(dt))
     return camIdx, ts
 
 
@@ -102,7 +123,7 @@ def parse_fname(fname):
 
 def to_datetime(t):
     if type(t) in (int, float):
-        dt = datetime.fromtimestamp(t, tz=timezone.utc)
+        dt = datetime.fromtimestamp(t, tz=pytz.utc)
         return dt
     elif type(t) == datetime:
         return t
@@ -360,7 +381,7 @@ def load_frame_container(fname):
         return FrameContainer.read(f)
 
 
-class Repository:
+class Repository(object):
     """
     The Repository class manages multiple bb_binary files. It creates a
     directory layout that enables fast access by the timestamp.
@@ -376,8 +397,7 @@ class Repository:
             root_dir (str):  Path where the repository is created
         """
         self.root_dir = os.path.abspath(root_dir)
-        if not os.path.exists(self.root_dir):
-            os.makedirs(self.root_dir)
+        mkdir_p(self.root_dir)
         self.minute_step = minute_step
         if not os.path.exists(self._repo_json_fname()):
             self._save_json()
@@ -411,11 +431,10 @@ class Repository:
         dt = to_datetime(ts)
         path = self._path_for_dt(dt)
         print(path)
-        try:
-            fnames = self._all_files_in(path)
-            print(fnames)
-        except FileNotFoundError:
+        if not os.path.exists(self._join_with_repo_dir(path)):
             return []
+        fnames = self._all_files_in(path)
+        print(fnames)
         parts = [self._parse_repo_fname(f) for f in fnames]
         print(parts)
         if cam is not None:
@@ -499,7 +518,7 @@ class Repository:
 
     def _path_for_dt(self, time, abs=False):
         dt = to_datetime(time)
-        minutes = math.floor(dt.minute / self.minute_step) * self.minute_step
+        minutes = int(math.floor(dt.minute / self.minute_step) * self.minute_step)
         path = "{:04d}/{:02d}/{:02d}/{:02d}/{:02d}".format(
             dt.year, dt.month, dt.day, dt.hour, minutes)
         if abs:
@@ -542,7 +561,7 @@ class Repository:
         time_parts_str = path.split('/')[-5:]
         print(time_parts_str)
         time_parts = list(map(int, time_parts_str))
-        return datetime(*time_parts, tzinfo=timezone.utc)
+        return datetime(*time_parts, tzinfo=pytz.utc)
 
     def _step_one_directory(self, path, direction='forward'):
         if type(path) == str:
@@ -587,7 +606,7 @@ class Repository:
             return self._path_for_dt(first_ts) != \
                 self._path_for_dt(end_dt)
         fname = self._get_filename(begin_dt, end_dt, cam_id, extension)
-        os.makedirs(os.path.dirname(fname), exist_ok=True)
+        mkdir_p(os.path.dirname(fname))
         if not os.path.exists(fname):
             open(fname, 'a').close()
         iter_ts = end
@@ -598,7 +617,7 @@ class Repository:
                                             extension, path)
             symlinks.append(link_fname)
             link_dir = os.path.dirname(link_fname)
-            os.makedirs(link_dir, exist_ok=True)
+            mkdir_p(link_dir)
             rel_goal = os.path.relpath(fname, start=link_dir)
             os.symlink(rel_goal, link_fname)
             iter_path = self._step_one_directory(iter_ts, 'backward')
@@ -606,7 +625,7 @@ class Repository:
         return fname, symlinks
 
     def _get_filename(self, begin_dt, end_dt, cam_id, extension='', path=None):
-        assert type(cam_id) is int
+        assert type(cam_id) in six.integer_types
         assert type(path) is str or path is None
 
         if path is None:

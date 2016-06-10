@@ -5,7 +5,8 @@ from bb_binary import build_frame_container, parse_video_fname, Frame, \
     _convert_detections_to_numpy, _convert_frame_to_numpy, get_detections
 
 import time
-from datetime import datetime, timezone
+from datetime import datetime
+import pytz
 import numpy as np
 import os
 import pytest
@@ -23,7 +24,7 @@ def test_bbb_relative_path():
 
 
 def test_dt_to_str():
-    dt = datetime(2015, 8, 15, 12, 0, 40, 333967, tzinfo=timezone.utc)
+    dt = datetime(2015, 8, 15, 12, 0, 40, 333967, tzinfo=pytz.utc)
     assert dt_to_str(dt) == "20150815T120040.333Z"
 
 
@@ -48,9 +49,9 @@ def test_bbb_frame_from_detections():
         assert np.allclose(capnp_detections[i].xRotation, detections[i, 7])
         assert np.allclose(capnp_detections[i].radius, detections[i, 8])
         assert np.allclose(
-            np.array(list(capnp_detections[i].decodedId)) / 255,
+            np.array(list(capnp_detections[i].decodedId)) / 255.,
             detections[i, 9:],
-            atol=0.5/255,
+            atol=0.5/255.,
         )
 
 
@@ -186,9 +187,9 @@ def bbb_check_frame_data(frame, arr, expected_keys):
             if key == 'decodedId' and \
                frame.detectionsUnion.which() == 'detectionsDP':
                 assert np.allclose(arr[key][i],
-                                   np.array([detection.decodedId[0] / 255] *
+                                   np.array([detection.decodedId[0] / 255.] *
                                             len(detection.decodedId)),
-                                   atol=0.5/255)
+                                   atol=0.5/255.)
             elif key == 'frameId':
                 assert np.all(arr[key] == getattr(frame, 'id'))
             elif hasattr(frame, key):
@@ -230,10 +231,10 @@ def test_bbb_repo_path_for_ts(tmpdir):
     path = repo._path_for_dt(datetime(2012, 2, 29, 8, 55))
     assert path == '2012/02/29/08/40'
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(pytz.utc)
     print(now.utcoffset())
     path = repo._path_for_dt(now)
-    expected_minutes = math.floor(now.minute / repo.minute_step) * repo.minute_step
+    expected_minutes = int(math.floor(now.minute / repo.minute_step) * repo.minute_step)
     expected_dt = now.replace(minute=expected_minutes, second=0, microsecond=0)
     print(expected_dt.utcoffset())
     assert repo._get_time_from_path(path) == expected_dt
@@ -243,13 +244,13 @@ def test_bbb_repo_get_ts_from_path(tmpdir):
     repo = Repository(str(tmpdir))
 
     path = '1800/10/01/00/00'
-    assert repo._get_time_from_path(path) == datetime(1800, 10, 1, 0, 0, tzinfo=timezone.utc)
+    assert repo._get_time_from_path(path) == datetime(1800, 10, 1, 0, 0, tzinfo=pytz.utc)
 
     path = '2017/10/15/23/40'
-    assert repo._get_time_from_path(path) == datetime(2017, 10, 15, 23, 40, tzinfo=timezone.utc)
+    assert repo._get_time_from_path(path) == datetime(2017, 10, 15, 23, 40, tzinfo=pytz.utc)
 
     # test inverse to path_for_ts
-    dt = datetime(2017, 10, 15, 23, repo.minute_step, tzinfo=timezone.utc)
+    dt = datetime(2017, 10, 15, 23, repo.minute_step, tzinfo=pytz.utc)
     path = repo._path_for_dt(dt)
     assert path == '2017/10/15/23/{:02d}'.format(repo.minute_step)
     assert repo._get_time_from_path(path) == dt
@@ -434,5 +435,5 @@ def test_parse_video_fname():
 
     fname = "Cam_0_19700101T001000.000000Z--19700101T002000.000000Z.bbb"
     camIdx, begin, end = parse_video_fname(fname, format='iso')
-    assert begin == datetime.fromtimestamp(10*60, tz=timezone.utc)
-    assert end == datetime.fromtimestamp(20*60, tz=timezone.utc)
+    assert begin == datetime.fromtimestamp(10*60, tz=pytz.utc)
+    assert end == datetime.fromtimestamp(20*60, tz=pytz.utc)
