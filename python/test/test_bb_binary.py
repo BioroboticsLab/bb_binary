@@ -1,12 +1,14 @@
 
 from conftest import fill_repository
 from bb_binary import build_frame_container, parse_video_fname, Frame, \
-    Repository, convert_detections_to_numpy, build_frame, dt_to_str
+    Repository,  build_frame, dt_to_str, convert_frame_to_numpy, \
+    _convert_detections_to_numpy, _convert_frame_to_numpy
 
 import time
 from datetime import datetime, timezone
 import numpy as np
 import os
+import pytest
 import math
 
 
@@ -52,8 +54,14 @@ def test_bbb_frame_from_detections():
         )
 
 
-def test_bbb_convert_detections_to_numpy():
+@pytest.fixture
+def example_frame_data():
     frame = Frame.new_message()
+    frame.id = 1
+    frame.dataSourceIdx = 1
+    frame.timedelta = 150
+    frame.timestamp = 1465290180
+
     frame.detectionsUnion.init('detectionsDP', 1)
     detection = frame.detectionsUnion.detectionsDP[0]
     detection.idx = 0
@@ -65,25 +73,94 @@ def test_bbb_convert_detections_to_numpy():
     detection.radius = 23
     nb_bits = 12
     bits = detection.init('decodedId', nb_bits)
-    bit_value = 24
+    bit_value = nb_bits * 2
     for i in range(nb_bits):
         bits[i] = bit_value
 
-    expectedKeys = ('idx', 'xpos', 'ypos', 'xRotation', 'yRotation',
-                    'zRotation', 'radius', 'decodedId')
-    excludedKeys = ('localizerSaliency', 'xposHive', 'yposHive')
-    arr = convert_detections_to_numpy(frame, excludedKeys)
+    return frame
 
+
+def test_bbb_convert_detections_to_numpy(example_frame_data):
+    """
+    Tests that detections are correctly converted to numpy array
+    and frame data is ignored.
+    """
+    frame = example_frame_data
+
+    expected_keys = ['idx', 'xpos', 'ypos', 'xRotation', 'yRotation',
+                     'zRotation', 'radius', 'decodedId']
+    excludedKeys = ['localizerSaliency', 'xposHive', 'yposHive']
+
+    detections = frame.detectionsUnion.detectionsDP
+    arr = _convert_detections_to_numpy(detections, excludedKeys)
+    bbb_check_frame_data(frame, arr, expected_keys)
+
+
+def test_bbb_convert_frame_to_numpy(example_frame_data):
+    """
+    Tests that frame data is correctly converted to numpy array
+    and detections are ignored.
+    """
+    frame = example_frame_data
+
+    expected_keys = ['frameId', 'timedelta', 'timestamp']
+    excludedKeys = ['dataSourceIdx']
+
+    arr = _convert_frame_to_numpy(frame, excludedKeys)
+    bbb_check_frame_data(frame, arr, expected_keys)
+
+
+def test_bbb_convert_only_frame_to_numpy(example_frame_data):
+    """
+    Tests that frame data is correctly converted to numpy array
+    and detections are ignored.
+    """
+    frame = example_frame_data
+
+    expected_keys = ['frameId', 'timedelta', 'timestamp']
+    excludedKeys = ['dataSourceIdx', 'detectionsUnion']
+
+    arr = _convert_frame_to_numpy(frame, excludedKeys)
+    bbb_check_frame_data(frame, arr, expected_keys)
+
+
+def test_bbb_convert_frame_and_detections_to_numpy(example_frame_data):
+    """
+    Tests that frame data and detections are correctly converted to np array.
+    """
+    frame = example_frame_data
+
+    expected_keys = ['frameId', 'timedelta', 'timestamp',
+                     'idx', 'xpos', 'ypos', 'xRotation', 'yRotation',
+                     'zRotation', 'radius', 'decodedId']
+    excludedKeys = ['dataSourceIdx', 'localizerSaliency',
+                    'xposHive', 'yposHive']
+
+    arr = convert_frame_to_numpy(frame, excludedKeys)
+    bbb_check_frame_data(frame, arr, expected_keys)
+
+
+def bbb_check_frame_data(frame, arr, expected_keys):
+    """
+    Helper to compare frame data to numpy array.
+    """
     # check if we have all the expected keys in the array (and only these)
-    assert len(expectedKeys) == len(arr.dtype.names)
-    assert set(expectedKeys) == set(arr.dtype.names)
+    assert set(expected_keys) == set(arr.dtype.names)
+    assert len(expected_keys) == len(arr.dtype.names)
+
+    detection = frame.detectionsUnion.detectionsDP[0]
 
     # check if the values are as expected
-    for key in expectedKeys:
+    for key in expected_keys:
         if key == 'decodedId':
             assert np.allclose(arr[key],
-                               np.array([bit_value / 255] * nb_bits),
+                               np.array([detection.decodedId[0] / 255] *
+                                        len(detection.decodedId)),
                                atol=0.5/255)
+        elif key == 'frameId':
+            assert arr[key] == getattr(frame, "id")
+        elif hasattr(frame, key):
+            assert arr[key] == getattr(frame, key)
         else:
             assert arr[key][0] == getattr(detection, key)
 

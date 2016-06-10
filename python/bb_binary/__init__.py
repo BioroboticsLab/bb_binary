@@ -2,6 +2,7 @@
 import capnp
 import os
 import numpy as np
+import numpy.lib.recfunctions as rf
 import json
 import math
 from datetime import datetime, timedelta, timezone
@@ -134,40 +135,106 @@ def get_video_fname(camIdx, begin, end):
     return get_fname(camIdx, begin) + "--" + dt_to_str(end)
 
 
-def convert_detections_to_numpy(frame, excludedKeys=[]):
+def convert_frame_to_numpy(frame, excluded_keys=None):
     """
-    Returns the detections as a numpy array from the frame.
+    Returns the frame data and detections as a numpy array from the frame.
+
+    Note: the frame id is identified in the array as frameId instead of id!
 
     Args:
         frame (Frame): datastructure with frame data from capnp.
-        excludedKeys (Optional list): keys that are not converted to np array
+        excluded_keys (Optional list): keys that are not converted to np array
     """
+    excluded_keys = excluded_keys or []
+
     union_type = frame.detectionsUnion.which()
     assert union_type == 'detectionsDP', \
         "Currently only the new pipeline format is supported."
 
-    detections = frame.detectionsUnion.detectionsDP
-    detection0 = detections[0].to_dict()
+    frame_arr = _convert_frame_to_numpy(frame, excluded_keys)
+    detection_arr = None
+
+    if "detectionsUnion" not in excluded_keys:
+        detections = frame.detectionsUnion.detectionsDP
+        detection_arr = _convert_detections_to_numpy(detections, excluded_keys)
+
+    if frame_arr is None:
+        return detection_arr
+
+    if detection_arr is None:
+        return frame_arr
+
+    frame_arr = np.repeat(frame_arr, len(detections), axis=0)
+    return rf.merge_arrays((frame_arr, detection_arr),
+                           flatten=True, usemask=False)
+
+
+def _convert_frame_to_numpy(frame, excluded_keys=None):
+    """
+    Helper function for `convert_frame_to_numpy(frame, excluded_keys)`.
+
+    Converts the frame data to a numpy array.
+    """
+    excluded_keys = excluded_keys or []
+    # automatically deduce keys and types from frame
+    keys = [key for key in list(frame.to_dict().keys())
+            if key not in excluded_keys and key != "detectionsUnion"]
+
+    # abort if no frame information should be extracted
+    if len(keys) == 0:
+        return None
+
+    # TODO: convert timestamp field to better suited dataype?
+    fields = [getattr(frame, key) for key in keys]
+    formats = [type(field) for field in fields]
+
+    # create frame
+    frame_arr = np.array(tuple(fields),
+                         dtype={'names': keys, 'formats': formats})
+
+    # replace id with frameId for better readability!
+    frame_arr.dtype.names = ["frameId" if x == "id" else x
+                             for x in frame_arr.dtype.names]
+
+    return frame_arr
+
+
+def _convert_detections_to_numpy(detections, excluded_keys=None):
+    """
+    Helper function for `convert_frame_to_numpy(frame, excluded_keys)`.
+
+    Converts the detections data to a numpy array.
+    """
+    excluded_keys = excluded_keys or []
+    nrows = len(detections)
+
     # automatically deduce keys and types except for decodedId
+    detection0 = detections[0].to_dict()
     keys = [key for key in list(detection0.keys())
-            if key not in excludedKeys]
+            if key not in excluded_keys]
+
+    # abort if no frame information should be extracted
+    if len(keys) == 0:
+        return None
+
     formats = [type(detection0[key]) for key in keys]
+
     decoded_id_key = "decodedId"
     # special handling of decodedId as float array
-    if decoded_id_key not in excludedKeys:
+    if decoded_id_key not in excluded_keys:
         decoded_id_index = keys.index(decoded_id_key)
         formats[decoded_id_index] = str(len(detection0[decoded_id_key])) + 'f8'
 
-    arr = np.zeros(len(detections), dtype={'names': keys, 'formats': formats})
+    detection_arr = np.empty(nrows, dtype={'names': keys, 'formats': formats})
     for i, detection in enumerate(detections):
         # make sure we have the same order as in keys
         val = [getattr(detection, key) for key in keys]
-        if decoded_id_key not in excludedKeys:
+        if decoded_id_key not in excluded_keys:
             val[decoded_id_index] = np.array(val[decoded_id_index]) / 255.
         # structured np arrays only accept tuples
-        arr[i] = tuple(val)
+        detection_arr[i] = tuple(val)
 
-    return arr
+    return detection_arr
 
 
 def nb_parameters(nb_bits):
