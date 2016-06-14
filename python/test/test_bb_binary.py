@@ -281,10 +281,12 @@ def test_bbb_repo_find_single_file_per_timestamp(tmpdir):
     assert repo.find(1000000) == []
 
 
-def test_bbb_repo_iter_fnames(tmpdir):
+def test_bbb_repo_iter_fnames_empty(tmpdir):
     repo = Repository(str(tmpdir.join('empty')))
     assert list(repo.iter_fnames()) == []
 
+
+def test_bbb_repo_iter_fnames_2_files_and_1_symlink_per_directory(tmpdir):
     repo = Repository(str(tmpdir.join('2_files_and_1_symlink_per_directory')))
     span = 500
     begin_end_cam_id = [(ts, ts + span + 100, 0) for ts in range(0, 10000, span)]
@@ -296,6 +298,8 @@ def test_bbb_repo_iter_fnames(tmpdir):
         repo._get_filename(*p, extension='bbb')) for p in begin_end_cam_id]
     assert fnames == expected_fnames
 
+
+def test_bbb_repo_iter_fnames_missing_directories(tmpdir):
     repo = Repository(str(tmpdir.join('missing_directories')))
     span = 1500
     begin_end_cam_id = [(ts, ts + span, 0)
@@ -310,6 +314,8 @@ def test_bbb_repo_iter_fnames(tmpdir):
         repo._get_filename(*p, extension='bbb')) for p in begin_end_cam_id]
     assert fbasenames == expected_fnames
 
+
+def test_bbb_repo_iter_fnames_from_to(tmpdir):
     repo = Repository(str(tmpdir.join('complex_from_to')))
     span = 1500
     begin_end_cam_id = [(ts, ts + span, 0)
@@ -322,15 +328,20 @@ def test_bbb_repo_iter_fnames(tmpdir):
     for fname in fnames:
         assert os.path.isabs(fname)
     fbasenames = [os.path.basename(f) for f in fnames]
-    slice_begin_end_cam_id = list(filter(lambda p: begin <= p[0] <= end,
+    slice_begin_end_cam_id = list(filter(lambda p: begin <= p[1] and p[0] < end,
                                          begin_end_cam_id))
+    print(slice_begin_end_cam_id)
     expected_fnames = [os.path.basename(
         repo._get_filename(*p, extension='bbb'))
                        for p in slice_begin_end_cam_id]
+    print(expected_fnames)
+    print(fbasenames)
     assert fbasenames == expected_fnames
 
+
+def test_bbb_repo_iter_fnames_from_to_and_cam(tmpdir):
     repo = Repository(str(tmpdir.join('complex_from_to_and_cam')))
-    span = 1500
+    span = 200
     begin_end_cam_id0 = [(ts, ts + span, 0) for ts in range(0, 10000, span)]
     begin_end_cam_id1 = [(ts, ts + span, 1) for ts in range(0, 10000, span)]
 
@@ -344,8 +355,9 @@ def test_bbb_repo_iter_fnames(tmpdir):
     for fname in fnames:
         assert os.path.isabs(fname)
     fbasenames = [os.path.basename(f) for f in fnames]
+    print(begin_end_cam_id)
     slice_begin_end_cam_id = list(filter(
-        lambda p: begin <= p[0] <= end and p[2] == cam,
+        lambda p: begin <= p[1] and p[0] < end and p[2] == cam,
         begin_end_cam_id))
     expected_fnames = [os.path.basename(
         repo._get_filename(*p, extension='bbb'))

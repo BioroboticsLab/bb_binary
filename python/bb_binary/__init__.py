@@ -96,8 +96,6 @@ def parse_video_fname(fname, format='beesbook'):
         _, camIdx, isotimespan = fname.split('_')
         start, end = isotimespan.split('--')
         end = end.rstrip(".bbb")
-        print(start)
-        print(end)
         return int(camIdx), iso8601.parse_date(start), iso8601.parse_date(end)
     else:
         raise ValueError("Unknown format {}.".format(format))
@@ -430,66 +428,85 @@ class Repository(object):
         """
         dt = to_datetime(ts)
         path = self._path_for_dt(dt)
-        print(path)
         if not os.path.exists(self._join_with_repo_dir(path)):
             return []
         fnames = self._all_files_in(path)
-        print(fnames)
         parts = [self._parse_repo_fname(f) for f in fnames]
-        print(parts)
         if cam is not None:
             parts = list(filter(lambda p: p[0] == cam, parts))
         found_files = []
         for (camId, begin, end), fname in zip(parts, fnames):
-            print("{} <= {} < {}".format(begin, dt, end))
             if begin <= dt < end:
                 found_files.append(self._join_with_repo_dir(path, fname))
         return found_files
 
     def iter_fnames(self, begin=None, end=None, cam=None):
         """
-        Returns a generator that yields fnames in sorted order.
+        Returns a generator that yields filenames in sorted order.
         From `begin` to `end`.
 
         Args:
-            begin (Optional timestamp): start with this timestamp.
-                If not set start with the frirst one.
-            end (Optional timestamp): last timestamp. If not set, start with
-                the earliest file.
-            cam (Optional int): Only yield fnames from this cam id.
+            begin (Optional timestamp): The first filename contains at least one frame with a
+                timestamp greater or equal to `begin`. If `begin` is not set, it will
+                start with the earliest file.
+            end (Optional timestamp): The last filename contains at least one
+                frame with a timestamp smaller then `end`.
+                If not set, it will continue until the last file.
+            cam (Optional int): Only yield filenames with this cam id.
+
+        Example:
+
+            Files:        A     B     C        D     E
+            Frames:    |-----|-----|-----|  |-----|-----|
+                            ⬆          ⬆
+                          begin       end
+
+            This should return the files A, B and C.
+            If `begin` and `end` are `None`, then all will be yield.
         """
 
-        def filter_no_links(directory, fnames):
+        def remove_links(directory, fnames):
             return list(filter(
                 lambda f: not os.path.islink(os.path.join(directory, f)),
                 fnames))
 
         if begin is None:
             current_path = self._get_earliest_path()
+            begin = pytz.utc.localize(datetime.min)
         else:
+            begin = to_datetime(begin)
             current_path = self._path_for_dt(begin, abs=True)
 
         if current_path == self.root_dir:
             return
 
-        if end is not None:
-            end_dir = self._path_for_dt(end, abs=True)
-        else:
+        if end is None:
             end_dir = self._get_latest_path()
+            end = pytz.utc.localize(datetime.max)
+        else:
+            end = to_datetime(end)
+            end_dir = self._path_for_dt(end, abs=True)
+
+        first_directory = True
         while True:
             fnames = self._all_files_in(current_path)
-            fnames = filter_no_links(current_path, fnames)
-            parts = [self._parse_repo_fname(f) for f in fnames]
-            begin_fnames = [(p[0], p[1], f) for p, f in zip(parts, fnames)]
-            if cam is not None:
-                begin_fnames = list(filter(lambda p: p[0] == cam,
-                                           begin_fnames))
+            if not first_directory:
+                fnames = remove_links(current_path, fnames)
+            else:
+                first_directory = False
 
-            begin_fnames = sorted(begin_fnames, key=lambda p: p[1])
-            for cam_idx, ts, fname in begin_fnames:
-                yield self._join_with_repo_dir(current_path, fname)
-            print(end_dir)
-            print(current_path)
+            parsed_fname = [self._parse_repo_fname(f) for f in fnames]
+            cam_id_begin_end_fnames = [(cam, b, e, f)
+                                       for (cam, b, e), f in zip(parsed_fname, fnames)]
+            if cam is not None:
+                cam_id_begin_end_fnames = list(filter(lambda p: p[0] == cam,
+                                                      cam_id_begin_end_fnames))
+
+            cam_id_begin_end_fnames.sort(key=lambda p: p[1])
+            for cam_idx, begin_ts, end_ts, fname in cam_id_begin_end_fnames:
+                if begin <= end_ts and begin_ts < end:
+                    yield self._join_with_repo_dir(current_path, fname)
+
             if end_dir == current_path:
                 break
             else:
@@ -559,7 +576,6 @@ class Repository(object):
     def _get_time_from_path(self, path):
         path = path.rstrip('/\\')
         time_parts_str = path.split('/')[-5:]
-        print(time_parts_str)
         time_parts = list(map(int, time_parts_str))
         return datetime(*time_parts, tzinfo=pytz.utc)
 
