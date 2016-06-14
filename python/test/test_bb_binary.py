@@ -1,4 +1,4 @@
-
+# -*- coding: utf-8 -*-
 from conftest import fill_repository
 from bb_binary import build_frame_container, parse_video_fname, Frame, \
     Repository,  build_frame, dt_to_str, convert_frame_to_numpy, \

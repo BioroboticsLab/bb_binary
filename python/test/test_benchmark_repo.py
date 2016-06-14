@@ -1,4 +1,5 @@
-
+# -*- coding: utf-8 -*-
+#
 from conftest import fill_repository
 from bb_binary import build_frame_container, Repository, build_frame, \
     nb_parameters

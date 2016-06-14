@@ -1,4 +1,4 @@
-
+# -*- coding: utf-8 -*-
 import capnp
 import os
 import errno
@@ -496,8 +496,7 @@ class Repository(object):
                 first_directory = False
 
             parsed_fname = [self._parse_repo_fname(f) for f in fnames]
-            cam_id_begin_end_fnames = [(cam, b, e, f)
-                                       for (cam, b, e), f in zip(parsed_fname, fnames)]
+            cam_id_begin_end_fnames = [(c, b, e, f) for (c, b, e), f in zip(parsed_fname, fnames)]
             if cam is not None:
                 cam_id_begin_end_fnames = list(filter(lambda p: p[0] == cam,
                                                       cam_id_begin_end_fnames))
