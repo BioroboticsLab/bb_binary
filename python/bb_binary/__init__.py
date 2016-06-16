@@ -167,13 +167,7 @@ def convert_frame_to_numpy(frame, keys=None):
     detection_arr = None
 
     if keys is None or 'detectionsUnion' in keys:
-        union_type = frame.detectionsUnion.which()
-        if union_type == 'detectionsDP':
-            detections = frame.detectionsUnion.detectionsDP
-        elif union_type == 'detectionsCVP':
-            detections = frame.detectionsUnion.detectionsCVP
-        else:
-            raise KeyError("Type {0} not supported.".format(union_type))
+        detections = get_detections(frame)
         detection_arr = _convert_detections_to_numpy(detections, keys)
 
     if frame_arr is None:
@@ -242,12 +236,17 @@ def _convert_detections_to_numpy(detections, keys=None):
 
     formats = [type(detection0[key]) for key in keys]
 
-    decoded_id_key = "decodedId"
+    readability_key = 'readability'
+    decoded_id_key = 'decodedId'
     decoded_id_index = None
-    # special handling of decodedId as float array in CP pipeline data
     if decoded_id_key in keys and isinstance(detection0[decoded_id_key], list):
+        # special handling of decodedId as float array in CP pipeline data
         decoded_id_index = keys.index(decoded_id_key)
         formats[decoded_id_index] = str(len(detection0[decoded_id_key])) + 'f8'
+    elif readability_key in keys:
+        # special handling of enum because numpy does not determine str length
+        readbility_index = keys.index(readability_key)
+        formats[readbility_index] = 'S10'
 
     detection_arr = np.empty(nrows, dtype={'names': keys, 'formats': formats})
     for i, detection in enumerate(detections):
@@ -268,6 +267,8 @@ def get_detections(frame):
         detections = frame.detectionsUnion.detectionsDP
     elif union_type == 'detectionsCVP':
         detections = frame.detectionsUnion.detectionsCVP
+    elif union_type == 'detectionsTruth':
+        detections = frame.detectionsUnion.detectionsTruth
     else:
         raise KeyError("Type {0} not supported.".format(union_type))
     return detections

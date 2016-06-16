@@ -110,6 +110,23 @@ def frame_cvp_data(frame_data):
     return frame
 
 
+@pytest.fixture
+def frame_truth_data(frame_data):
+    """Frame with truth data."""
+    frame = frame_data.copy()
+    frame.detectionsUnion.init('detectionsTruth', 3)
+    readability = ('completely', 'partially', 'none')
+    for i in range(0, 3):
+        detection = frame.detectionsUnion.detectionsTruth[i]
+        detection.idx = i
+        detection.xpos = 344
+        detection.ypos = 5498
+        detection.decodedId = 2015 + i
+        detection.readability = readability[i]
+
+    return frame
+
+
 def test_bbb_convert_detections_to_numpy(frame_dp_data):
     """Detections are correctly converted to np array and frame is ignored."""
     frame = frame_dp_data
@@ -166,6 +183,18 @@ def test_bbb_convert_frame_and_detections_cvp_to_numpy(frame_cvp_data):
     bbb_check_frame_data(frame, arr, expected_keys)
 
 
+def test_bbb_convert_frame_and_detections_truth_to_numpy(frame_truth_data):
+    """Frame and detections (cvp) are correctly converted to np array."""
+    frame = frame_truth_data
+
+    expected_keys = ('frameId', 'timedelta', 'timestamp',
+                     'idx', 'xpos', 'ypos', 'decodedId', 'readability',
+                     'detectionsUnion')
+
+    arr = convert_frame_to_numpy(frame, expected_keys)
+    bbb_check_frame_data(frame, arr, expected_keys)
+
+
 def bbb_check_frame_data(frame, arr, expected_keys):
     """Helper to compare frame data to numpy array."""
     # check if we have all the expected keys in the array (and only these)
@@ -174,6 +203,7 @@ def bbb_check_frame_data(frame, arr, expected_keys):
     assert expected_keys == set(arr.dtype.names)
     assert len(expected_keys) == len(arr.dtype.names)
 
+    detection_string_fields = ('readability')
     detections = get_detections(frame)
     for i, detection in enumerate(detections):
         # check if the values are as expected
@@ -190,6 +220,8 @@ def bbb_check_frame_data(frame, arr, expected_keys):
                 # all detections are from the same frame
                 # so we expect the whole column to have the same value.
                 assert np.all(arr[key] == getattr(frame, key))
+            elif key in detection_string_fields:
+                assert arr[key][i].decode('UTF-8') == getattr(detection, key)
             else:
                 assert arr[key][i] == getattr(detection, key)
 

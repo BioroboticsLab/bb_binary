@@ -6,8 +6,8 @@ $Java.outerClassname("BeesBook");
 
 
 struct DetectionCVP {
-  idx @0 :UInt16;                # sequential index of the detection, counted from 0 for every frame.
-                                 # The combination (idx, Frame.id) is a global key.
+  idx @0 :UInt16;                # sequential index of the detection, counted from 0 for every frame
+                                 # the combination (idx, Frame.id) is a global key
   candidateIdx @1 :UInt16;       # sequential index of the candidate per tag
   gridIdx @2 :UInt16;            # sequential index of the grid/decoding per candidate
   xpos @3 :UInt16;               # x coordinate of the grid center
@@ -24,8 +24,8 @@ struct DetectionCVP {
 }
 
 struct DetectionDP {
-  idx @0 :UInt16;                # sequential index of the detection, counted from 0 for every frame.
-                                 # The combination (idx, Frame.id) is a global key.
+  idx @0 :UInt16;                # sequential index of the detection, counted from 0 for every frame
+                                 # the combination (idx, Frame.id) is a global key
   xpos @1 :UInt16;               # x coordinate of the grid center wrt. the image
   ypos @2 :UInt16;               # y coordinate of the grid center wrt. the image
   xposHive @3 :UInt16;           # x coordinate of the grid center wrt. the hive
@@ -39,6 +39,23 @@ struct DetectionDP {
                                  # p(first bit == 1) = decodedId[0] / 255
 }
 
+struct DetectionTruth {
+  idx @0 :UInt16;                # sequential index of the detection, counted from 0 for every frame
+                                 # the combination (idx, Frame.id) is a global key
+  xpos @1 :UInt16;               # x coordinate of the grid center wrt. the image
+  ypos @2 :UInt16;               # y coordinate of the grid center wrt. the image
+  xposHive @3 :UInt16;           # x coordinate of the grid center wrt. the hive
+  yposHive @4 :UInt16;           # y coordinate of the grid center wrt. the hive
+  decodedId @5 :UInt32;          # decoded id by human
+  readability @6 :Grade;         # tags might be visible or (partially) obscured
+  enum Grade {                   # ranks for evaluation of a tag's readability are:
+    completely @0;               #  - completely visible **and** human readable
+    partially @1;                #  - only partially visible and therefore **not** human readable
+    none @2;                     #  - **not** visible at all
+  }
+}
+
+
 # Corresponds to an image in the video.
 struct Frame {
   id @0 :UInt64;                 # global unique id of the frame
@@ -46,8 +63,9 @@ struct Frame {
   timestamp @2 :Float64;         # unix time stamp of the frame
   timedelta @3 :UInt32;          # time difference between this frame and the frame before in microseconds
   detectionsUnion : union {
-    detectionsCVP @4 :List(DetectionCVP);     # detections format of the old computer vision pipeline
-    detectionsDP  @5 :List(DetectionDP);      # detections format of the new deeppipeline
+    detectionsCVP   @4 :List(DetectionCVP);   # detections format of the old computer vision pipeline
+    detectionsDP    @5 :List(DetectionDP);    # detections format of the new deeppipeline
+    detectionsTruth @6 :List(DetectionTruth); # detections format of ground truth data
   }
 }
 
