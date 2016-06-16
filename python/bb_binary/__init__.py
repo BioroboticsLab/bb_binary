@@ -234,7 +234,7 @@ def _convert_detections_to_numpy(detections, keys=None):
     if keys is None:
         keys = list(detection_keys)
     else:
-        keys = list(set(keys) & detection0.keys())
+        keys = list(set(keys) & detection_keys)
 
     # abort if no frame information should be extracted
     if len(keys) == 0:
