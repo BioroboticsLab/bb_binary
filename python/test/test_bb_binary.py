@@ -72,7 +72,6 @@ def frame_dp_data(frame_data):
     """Frame with detections in new pipeline format."""
     frame = frame_data.copy()
     frame.detectionsUnion.init('detectionsDP', 3)
-    # TODO: hivepos and more detections
     for i in range(0, 3):
         detection = frame.detectionsUnion.detectionsDP[i]
         detection.idx = i
@@ -96,11 +95,10 @@ def frame_cvp_data(frame_data):
     """Frame with detections in old pipeline format."""
     frame = frame_data.copy()
     frame.detectionsUnion.init('detectionsCVP', 3)
-    # TODO: hivepos and scores
     for i in range(0, 3):
         detection = frame.detectionsUnion.detectionsCVP[i]
-        detection.idx = i
-        detection.candidateIdx = 0  # or is it *i* and *0* for *gridIdx*?
+        detection.idx = 0
+        detection.candidateIdx = 0
         detection.gridIdx = i
         detection.xpos = 344
         detection.ypos = 5498
@@ -115,23 +113,21 @@ def frame_cvp_data(frame_data):
 def test_bbb_convert_detections_to_numpy(frame_dp_data):
     """Detections are correctly converted to np array and frame is ignored."""
     frame = frame_dp_data
-    expected_keys = ['idx', 'xpos', 'ypos', 'xRotation', 'yRotation',
-                     'zRotation', 'radius', 'decodedId']
-    excluded_keys = ['localizerSaliency', 'xposHive', 'yposHive']
+    expected_keys = ('idx', 'xpos', 'ypos', 'xRotation', 'yRotation',
+                     'zRotation', 'radius', 'decodedId')
 
     detections = frame.detectionsUnion.detectionsDP
-    arr = _convert_detections_to_numpy(detections, excluded_keys)
+    arr = _convert_detections_to_numpy(detections, expected_keys)
     bbb_check_frame_data(frame, arr, expected_keys)
 
 
-def test_bbb_convert_frame_to_numpy(frame_dp_data):
+def test_bbb_convert_frame_to_numpy(frame_data):
     """Frame is correctly converted to np array and detections are ignored."""
-    frame = frame_dp_data
+    frame = frame_data
 
-    expected_keys = ['frameId', 'timedelta', 'timestamp']
-    excluded_keys = ['dataSourceIdx']
+    expected_keys = ('frameId', 'timedelta', 'timestamp')
 
-    arr = _convert_frame_to_numpy(frame, excluded_keys)
+    arr = _convert_frame_to_numpy(frame, expected_keys)
     bbb_check_frame_data(frame, arr, expected_keys)
 
 
@@ -139,10 +135,9 @@ def test_bbb_convert_only_frame_to_numpy(frame_dp_data):
     """Frame is correctly converted to np array and detections are ignored."""
     frame = frame_dp_data
 
-    expected_keys = ['frameId', 'timedelta', 'timestamp']
-    excluded_keys = ['dataSourceIdx', 'detectionsUnion']
+    expected_keys = ('frameId', 'timedelta', 'timestamp')
 
-    arr = _convert_frame_to_numpy(frame, excluded_keys)
+    arr = _convert_frame_to_numpy(frame, expected_keys)
     bbb_check_frame_data(frame, arr, expected_keys)
 
 
@@ -150,13 +145,11 @@ def test_bbb_convert_frame_and_detections_dp_to_numpy(frame_dp_data):
     """Frame and detections (dp) are correctly converted to np array."""
     frame = frame_dp_data
 
-    expected_keys = ['frameId', 'timedelta', 'timestamp',
+    expected_keys = ('frameId', 'timedelta', 'timestamp',
                      'idx', 'xpos', 'ypos', 'xRotation', 'yRotation',
-                     'zRotation', 'radius', 'decodedId']
-    excluded_keys = ['dataSourceIdx', 'localizerSaliency',
-                     'xposHive', 'yposHive']
+                     'zRotation', 'radius', 'decodedId', 'detectionsUnion')
 
-    arr = convert_frame_to_numpy(frame, excluded_keys)
+    arr = convert_frame_to_numpy(frame, expected_keys)
     bbb_check_frame_data(frame, arr, expected_keys)
 
 
@@ -164,20 +157,21 @@ def test_bbb_convert_frame_and_detections_cvp_to_numpy(frame_cvp_data):
     """Frame and detections (cvp) are correctly converted to np array."""
     frame = frame_cvp_data
 
-    expected_keys = ['frameId', 'timedelta', 'timestamp',
+    expected_keys = ('frameId', 'timedelta', 'timestamp',
                      'idx', 'xpos', 'ypos', 'xRotation', 'yRotation',
-                     'zRotation', 'candidateIdx', 'gridIdx', 'decodedId']
-    excluded_keys = ['dataSourceIdx', 'lScore', 'eScore', 'gScore',
-                     'xposHive', 'yposHive']
+                     'zRotation', 'candidateIdx', 'gridIdx', 'decodedId',
+                     'detectionsUnion')
 
-    arr = convert_frame_to_numpy(frame, excluded_keys)
+    arr = convert_frame_to_numpy(frame, expected_keys)
     bbb_check_frame_data(frame, arr, expected_keys)
 
 
 def bbb_check_frame_data(frame, arr, expected_keys):
     """Helper to compare frame data to numpy array."""
     # check if we have all the expected keys in the array (and only these)
-    assert set(expected_keys) == set(arr.dtype.names)
+    expected_keys = set(expected_keys)
+    expected_keys.discard('detectionsUnion')
+    assert expected_keys == set(arr.dtype.names)
     assert len(expected_keys) == len(arr.dtype.names)
 
     detections = get_detections(frame)
