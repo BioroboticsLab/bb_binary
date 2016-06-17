@@ -285,6 +285,7 @@ def build_frame(
         frame,
         timestamp,
         detections,
+        frame_idx,
         data_source=0,
         detection_format='deeppipeline'
 ):
@@ -317,6 +318,7 @@ def build_frame(
     """
     assert detection_format == 'deeppipeline'
     frame.dataSourceIdx = int(data_source)
+    frame.frameIdx = int(frame_idx)
     detec_builder = frame.detectionsUnion.init('detectionsDP',
                                                len(detections))
     for i, detection in enumerate(detections):

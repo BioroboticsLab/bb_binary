@@ -43,6 +43,7 @@ struct DetectionDP {
 struct Frame {
   id @0 :UInt64;                 # global unique id of the frame
   dataSourceIdx @1:UInt32;       # the frame is from this data source
+  frameIdx @6 :UInt32;           # sequential increasing index for every data source.
   timestamp @2 :Float64;         # unix time stamp of the frame
   timedelta @3 :UInt32;          # time difference between this frame and the frame before in microseconds
   detectionsUnion : union {
