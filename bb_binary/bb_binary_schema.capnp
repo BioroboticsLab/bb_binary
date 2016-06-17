@@ -52,6 +52,7 @@ struct DetectionTruth {
     completely @0;               #  - completely visible **and** human readable
     partially @1;                #  - only partially visible and therefore **not** human readable
     none @2;                     #  - **not** visible at all
+    unknown @3;                  #  - not considered or evaluted
   }
 }
 
@@ -66,7 +67,7 @@ struct Frame {
   detectionsUnion : union {
     detectionsCVP   @4 :List(DetectionCVP);   # detections format of the old computer vision pipeline
     detectionsDP    @5 :List(DetectionDP);    # detections format of the new deeppipeline
-    detectionsTruth @6 :List(DetectionTruth); # detections format of ground truth data
+    detectionsTruth @7 :List(DetectionTruth); # detections format of ground truth data
   }
 }
 

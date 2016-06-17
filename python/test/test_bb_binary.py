@@ -117,9 +117,9 @@ def frame_cvp_data(frame_data):
 def frame_truth_data(frame_data):
     """Frame with truth data."""
     frame = frame_data.copy()
-    frame.detectionsUnion.init('detectionsTruth', 3)
-    readability = ('completely', 'partially', 'none')
-    for i in range(0, 3):
+    frame.detectionsUnion.init('detectionsTruth', 4)
+    readability = ('completely', 'partially', 'none', 'unknown')
+    for i in range(0, len(readability)):
         detection = frame.detectionsUnion.detectionsTruth[i]
         detection.idx = i
         detection.xpos = 344
