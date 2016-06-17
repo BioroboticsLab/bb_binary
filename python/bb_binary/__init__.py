@@ -228,7 +228,7 @@ def _convert_detections_to_numpy(detections, keys=None):
     if keys is None:
         keys = list(detection_keys)
     else:
-        keys = list(set(keys) & detection0.keys())
+        keys = list(set(keys) & detection_keys)
 
     # abort if no frame information should be extracted
     if len(keys) == 0:
@@ -286,6 +286,7 @@ def build_frame(
         frame,
         timestamp,
         detections,
+        frame_idx,
         data_source=0,
         detection_format='deeppipeline'
 ):
@@ -318,6 +319,7 @@ def build_frame(
     """
     assert detection_format == 'deeppipeline'
     frame.dataSourceIdx = int(data_source)
+    frame.frameIdx = int(frame_idx)
     detec_builder = frame.detectionsUnion.init('detectionsDP',
                                                len(detections))
     for i, detection in enumerate(detections):

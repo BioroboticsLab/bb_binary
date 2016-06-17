@@ -31,14 +31,17 @@ def test_dt_to_str():
 def test_bbb_frame_from_detections():
     frame = Frame.new_message()
     timestamp = time.time()
+    frame_idx = 10
     detections = np.array([
         [0, 24, 43, 243, 234, 1, 0.1, 0.4, 0.1, 0.3] + [0.9] * 12,
         [1, 324, 543, 243, 234, 1,  0.1, 0.4, 0.1, 0.3] + [0.2] * 12,
     ])
 
-    build_frame(frame, timestamp, detections)
+    build_frame(frame, timestamp, detections, frame_idx)
     capnp_detections = frame.detectionsUnion.detectionsDP
 
+    assert frame.frameIdx == frame_idx
+    assert frame.dataSourceIdx == 0
     for i in range(len(detections)):
         assert capnp_detections[i].xpos == detections[i, 1]
         assert capnp_detections[i].ypos == detections[i, 2]
