@@ -55,11 +55,11 @@ def test_benchmark_add(benchmark, example_experiment_repo):
     frame_container = build_frame_container(ts, ts + duration, cam_id)
     frames = frame_container.init('frames', 1024)
     frame_ts = ts
-    for frame in frames:
+    for i, frame in enumerate(frames):
         nb_detections = random.randint(75, 150)
         detections = np.random.uniform(
             0, 1, (nb_detections, nb_parameters(nb_bits)))
-        build_frame(frame, frame_ts, detections)
+        build_frame(frame, frame_ts, detections, frame_idx=i)
 
     def add():
         ts = random.randint(begin, end)
