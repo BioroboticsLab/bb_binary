@@ -21,6 +21,7 @@ FrameContainer = bbb.FrameContainer
 DataSource = bbb.DataSource
 DetectionCVP = bbb.DetectionCVP
 DetectionDP = bbb.DetectionDP
+DetectionTruth = bbb.DetectionTruth
 
 _TIMEZONE = pytz.timezone('Europe/Berlin')
 
@@ -379,6 +380,93 @@ def build_frame_container(from_ts, to_ts, cam_id,
     if video_preview_fname is not None:
         data_source.videoPreviewFilename = video_preview_fname
     return fc
+
+
+def build_truth_frame_container(df, cam_id, frame_offset=0):
+    """Builds a frame container containing truth data from dataframe
+
+    Operates differently from `build_frame_container` because it will be used
+    in a different context where we have access to more data.
+
+    The minimal set of expected column names in `df` are listed in
+    `minimal_keyset`. Column names are matched to `Frame` and `DetectionTruth`
+    attributes. Set additional `FrameContainer` attributes like `hiveId` in
+    the return value.
+
+    Args:
+        df (dataframe): dataframe with truth data
+        cam_id (int): id of camera, also used as `FrameContainer` id
+        frame_offset (Optional int): offset for unique frame ids
+
+     Returns:
+         FrameContainer: converted data from `df`
+         int: number of frames that could be used as `frame_offset`
+     """
+    # start with removing untracked data
+    df = df.dropna().copy()
+
+    # check that we have all the information we need
+    minimal_keyset = frozenset(['xpos', 'ypos', 'decodedId', 'timestamp'])
+    assert minimal_keyset <= set(df.keys())
+
+    # convert timestamp to unixtimestamp
+    if 'datetime' in df.dtypes.timestamp.name:
+        df.timestamp = df.timestamp.apply(
+            lambda t: to_timestamp(datetime(
+                        t.year, t.month, t.day, t.hour, t.minute, t.second,
+                        t.microsecond, tzinfo=pytz.utc)))
+
+    # select only entries for cam
+    if 'camId' in df.keys():
+        df = df[df.camId == cam_id]
+
+    # create frame container
+    tstamps = df.timestamp.unique()
+    start = np.asscalar(min(tstamps))
+    end = np.asscalar(max(tstamps))
+    new_frame_offset = frame_offset + len(tstamps)
+
+    fc = build_frame_container(start, end, cam_id)
+    fc.id = cam_id  # overwrite if necessary!
+    fc.init('frames', len(tstamps))
+
+    # determine which fields we could assign from dataframe to cap'n proto
+    frame = Frame.new_message()
+    frame_fields = [field for field in df.keys()
+                    if hasattr(frame, field)]
+
+    detection = DetectionTruth.new_message()
+    detection_fields = [field for field in df.keys()
+                        if hasattr(detection, field)]
+    has_readability = 'readability' in detection_fields
+
+    def set_attr_from(object, src, key):
+        """Get attr `key` from `src` and set val to `object` on same `key`"""
+        val = getattr(src, key)
+        if type(val).__module__ == np.__name__:
+            val = np.asscalar(val)
+        setattr(object, key, val)
+
+    # create frames (each timestamp maps to a frame)
+    for frameIdx, group in enumerate(df.groupby(by='timestamp')):
+        timestamp, detections = group
+        frame = fc.frames[frameIdx]
+        frame.id = frame_offset + frameIdx
+        frame.frameIdx = frameIdx
+
+        # take first row, assumes that cols `frame_fields` have unique values!
+        [set_attr_from(frame, detections.iloc[0], key) for key in frame_fields]
+
+        # create detections
+        frame.detectionsUnion.init('detectionsTruth', detections.shape[0])
+        for detectionIdx, row in enumerate(detections.itertuples(index=False)):
+            detection = frame.detectionsUnion.detectionsTruth[detectionIdx]
+            detection.idx = detectionIdx
+            [set_attr_from(detection, row, key) for key in detection_fields]
+            if not has_readability:
+                detection.readability = 'unknown'
+
+    return fc, new_frame_offset
 
 
 def load_frame_container(fname):

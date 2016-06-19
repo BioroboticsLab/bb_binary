@@ -2,13 +2,16 @@
 from conftest import fill_repository
 from bb_binary import build_frame_container, parse_video_fname, Frame, \
     Repository,  build_frame, dt_to_str, convert_frame_to_numpy, \
-    _convert_detections_to_numpy, _convert_frame_to_numpy, get_detections
+    _convert_detections_to_numpy, _convert_frame_to_numpy, get_detections, \
+    build_truth_frame_container, to_datetime
 
 import time
 from datetime import datetime
 import pytz
 import numpy as np
 import os
+import pandas as pd
+from pandas.util.testing import assert_frame_equal
 import pytest
 import math
 
@@ -128,6 +131,109 @@ def frame_truth_data(frame_data):
         detection.readability = readability[i]
 
     return frame
+
+
+def test_bbb_frame_container_from_truth_data(frame_truth_data):
+    """Truth data is correctly converted to `FrameContainer`."""
+    frame = frame_truth_data
+    expected_keys = ('timestamp', 'xpos', 'ypos', 'decodedId',
+                     'readability', 'detectionsUnion')
+
+    arr = convert_frame_to_numpy(frame, expected_keys)
+    bbb_check_frame_data(frame, arr, expected_keys)
+    truth_detections = pd.DataFrame(arr)
+    nDetections = len(frame.detectionsUnion.detectionsTruth)
+
+    def convert_readability(df):
+        df.readability = df.readability.apply(lambda x: x.decode('UTF-8'))
+        return df
+
+    truth_detections = convert_readability(truth_detections)
+    offset = 0
+
+    # test minimal set
+    fc, offset = build_truth_frame_container(truth_detections, offset)
+    assert offset == 1
+    assert fc.id == 0
+    assert fc.camId == 0
+    assert fc.fromTimestamp == truth_detections.timestamp[0]
+    assert fc.toTimestamp == truth_detections.timestamp[3]
+    assert len(fc.frames) == 1
+
+    frame0 = fc.frames[0]
+    assert frame0.id == offset - 1
+    assert frame0.frameIdx == 0
+    assert frame0.timestamp == truth_detections.timestamp[0]
+    assert len(frame0.detectionsUnion.detectionsTruth) == 4
+
+    detections = pd.DataFrame(convert_frame_to_numpy(frame0, expected_keys))
+    detections = convert_readability(detections)
+    assert_frame_equal(detections, truth_detections)
+
+    # test without readability
+    df = truth_detections.drop('readability', axis=1)
+    fc, offset = build_truth_frame_container(df, offset, frame_offset=offset)
+    assert offset == 2  # test offset and id to test for fixed assignments
+    assert fc.id == 1
+    assert fc.camId == 1
+    assert len(fc.frames) == 1
+
+    frame0 = fc.frames[0]
+    assert frame0.id == offset - 1  # test if offset is considered
+    assert frame0.frameIdx == 0
+
+    for i in range(0, nDetections):  # test for default readability value
+        frame0.detectionsUnion.detectionsTruth[i].readability == b'undefined'
+
+    # test with datetime instead of unixtimestamp
+    df = truth_detections
+    df.timestamp = df.timestamp.apply(lambda x: to_datetime(x))
+    fc, offset = build_truth_frame_container(df, offset, frame_offset=offset)
+    assert offset == 3
+    fc.fromTimestamp == truth_detections.timestamp[0]
+    assert len(fc.frames) == 1
+
+    # test with additional column for frames
+    df = truth_detections
+    df['dataSourceIdx'] = 99
+    fc, offset = build_truth_frame_container(df, offset, frame_offset=offset)
+    assert offset == 4
+    assert len(fc.frames) == 1
+
+    frame0 = fc.frames[0]
+    assert frame0.dataSourceIdx == df.dataSourceIdx[0]
+
+    # test with additional column for detections
+    df = truth_detections
+    df['xposHive'] = range(0, nDetections)
+    fc, offset = build_truth_frame_container(df, offset, frame_offset=offset)
+    assert offset == 5
+    assert len(fc.frames) == 1
+
+    detections = fc.frames[0].detectionsUnion.detectionsTruth
+    for i in range(0, nDetections):
+        assert detections[i].xposHive == df.xposHive[i]
+
+    # test with NA values
+    df = truth_detections
+    df.decodedId[0] = None
+    fc, offset = build_truth_frame_container(df, offset, frame_offset=offset)
+    assert offset == 6
+    assert len(fc.frames) == 1
+
+    detections = fc.frames[0].detectionsUnion.detectionsTruth
+    assert len(detections) == nDetections - 1  # one detection removed!
+
+    # test with camId column
+    df = truth_detections
+    df['camId'] = offset
+    df['camId'][0] = offset - 1
+    fc, offset = build_truth_frame_container(df, offset, frame_offset=offset)
+    assert offset == 7
+    assert len(fc.frames) == 1
+
+    detections = fc.frames[0].detectionsUnion.detectionsTruth
+    assert len(detections) == nDetections - 1  # one detection removed!
 
 
 def test_bbb_convert_detections_to_numpy(frame_dp_data):
