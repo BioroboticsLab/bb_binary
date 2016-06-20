@@ -457,13 +457,13 @@ def test_bbb_iter_frames_from_to(tmpdir):
     check_tstamp_invariant(repo_end + 10, repo_end + 20)
 
     # check whole length
-    all_frames = [frame for frame, _ in repo.iter_frames()]
+    all_frames = [f for f, _ in repo.iter_frames()]
     assert len(all_frames) == nFrames
     # check with begin = None
-    skip_end = [frame for frame, _ in repo.iter_frames(end=repo_end - span)]
+    skip_end = [f for f, _ in repo.iter_frames(end=repo_end - span)]
     assert len(skip_end) == nFrames - span
     # check with end = None
-    skip_start = [frame for frame, _ in repo.iter_frames(begin=span)]
+    skip_start = [f for f, _ in repo.iter_frames(begin=span)]
     assert len(skip_start) == nFrames - span
 
 
