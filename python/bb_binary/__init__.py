@@ -411,6 +411,13 @@ def build_truth_frame_container(df, cam_id, frame_offset=0):
          FrameContainer: converted data from `df`
          int: number of frames that could be used as `frame_offset`
      """
+    def set_attr_from(object, src, key):
+        """Get attr `key` from `src` and set val to `object` on same `key`"""
+        val = getattr(src, key)
+        if type(val).__module__ == np.__name__:
+            val = np.asscalar(val)
+        setattr(object, key, val)
+
     # start with removing untracked data
     df = df.dropna().copy()
 
@@ -449,13 +456,6 @@ def build_truth_frame_container(df, cam_id, frame_offset=0):
                         if hasattr(detection, field)]
     has_readability = 'readability' in detection_fields
 
-    def set_attr_from(object, src, key):
-        """Get attr `key` from `src` and set val to `object` on same `key`"""
-        val = getattr(src, key)
-        if type(val).__module__ == np.__name__:
-            val = np.asscalar(val)
-        setattr(object, key, val)
-
     # create frames (each timestamp maps to a frame)
     for frameIdx, group in enumerate(df.groupby(by='timestamp')):
         timestamp, detections = group
@@ -464,14 +464,16 @@ def build_truth_frame_container(df, cam_id, frame_offset=0):
         frame.frameIdx = frameIdx
 
         # take first row, assumes that cols `frame_fields` have unique values!
-        [set_attr_from(frame, detections.iloc[0], key) for key in frame_fields]
+        for key in frame_fields:
+            set_attr_from(frame, detections.iloc[0], key)
 
         # create detections
         frame.detectionsUnion.init('detectionsTruth', detections.shape[0])
         for detectionIdx, row in enumerate(detections.itertuples(index=False)):
             detection = frame.detectionsUnion.detectionsTruth[detectionIdx]
             detection.idx = detectionIdx
-            [set_attr_from(detection, row, key) for key in detection_fields]
+            for key in detection_fields:
+                set_attr_from(detection, row, key)
             if not has_readability:
                 detection.readability = 'unknown'
 
