@@ -628,9 +628,9 @@ class Repository(object):
         for f in self.iter_fnames(begin=begin, end=end):
             fc = load_frame_container(f)
             for frame in fc.frames:
-                if ((begin is None or frame.timestamp <= begin) and
-                   (end is None or end < frame.timestamp)):
-                    yield frame, None
+                if ((begin is None or begin <= frame.timestamp) and
+                   (end is None or frame.timestamp < end)):
+                    yield frame, fc
 
     @staticmethod
     def load(directory):

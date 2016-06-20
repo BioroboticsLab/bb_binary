@@ -421,9 +421,10 @@ def test_bbb_iter_frames_from_to(tmpdir):
     """Tests that only frames in given range are iterated."""
     repo = Repository(str(tmpdir.join('frames_from_to')))
     repo_start = 0
-    nFrames = 10
+    nFC = 10
     span = 1000
-    repo_end = repo_start + nFrames * span
+    nFrames = nFC * span
+    repo_end = repo_start + nFrames
     begin_end_cam_id = [(ts, ts + span, 0)
                         for ts in range(repo_start, repo_end, span)]
     for begin, end, cam_id in begin_end_cam_id:
@@ -437,7 +438,11 @@ def test_bbb_iter_frames_from_to(tmpdir):
 
     def check_tstamp_invariant(begin, end):
         """Helper to check if begin <= tstamp < end is true for all frames."""
-        for frame, _ in repo.iter_frames(begin, end):
+        for frame, fc in repo.iter_frames(begin, end):
+            # frame container invariant
+            assert begin < fc.toTimestamp
+            assert fc.fromTimestamp < end
+            # frame invariant
             assert begin <= frame.timestamp < end
 
     # repo_start < start < end < repo_end
@@ -450,6 +455,16 @@ def test_bbb_iter_frames_from_to(tmpdir):
     check_tstamp_invariant(repo_start + 10, repo_end + 10)
     # repo_start < repo_end < start < end
     check_tstamp_invariant(repo_end + 10, repo_end + 20)
+
+    # check whole length
+    all_frames = [frame for frame, _ in repo.iter_frames()]
+    assert len(all_frames) == nFrames
+    # check with begin = None
+    skip_end = [frame for frame, _ in repo.iter_frames(end=repo_end - span)]
+    assert len(skip_end) == nFrames - span
+    # check with end = None
+    skip_start = [frame for frame, _ in repo.iter_frames(begin=span)]
+    assert len(skip_start) == nFrames - span
 
 
 def test_bbb_repo_iter_fnames_empty(tmpdir):
