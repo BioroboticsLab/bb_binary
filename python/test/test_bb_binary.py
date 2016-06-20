@@ -305,6 +305,38 @@ def test_bbb_convert_frame_and_detections_truth_to_numpy(frame_truth_data):
     bbb_check_frame_data(frame, arr, expected_keys)
 
 
+def test_bbb_convert_frame_with_additional_cols_to_numpy(frame_dp_data):
+    """Frame with additional columns is correctly converted to np array."""
+    frame = frame_dp_data
+
+    expected_keys = ('frameId', 'timedelta', 'timestamp',
+                     'decodedId', 'detectionsUnion')
+
+    # one col, single value for whole columns
+    arr = convert_frame_to_numpy(frame, expected_keys, add_cols={'camId': 2})
+    assert 'camId' in arr.dtype.names
+    assert np.all(arr['camId'] == 2)
+
+    # two cols, single value
+    arr = convert_frame_to_numpy(frame, expected_keys,
+                                 add_cols={'camId': 2, 'second': 3})
+    assert 'camId' in arr.dtype.names
+    assert 'second' in arr.dtype.names
+    assert np.all(arr['camId'] == 2)
+    assert np.all(arr['second'] == 3)
+
+    # list for whole column
+    arr = convert_frame_to_numpy(frame, expected_keys,
+                                 add_cols={'camId': range(0, 3)})
+    assert 'camId' in arr.dtype.names
+    assert np.all(arr['camId'] == np.array(range(0, 3)))
+
+    # existing column
+    with pytest.raises(AssertionError):
+        arr = convert_frame_to_numpy(frame, expected_keys,
+                                     add_cols={'frameId': 9})
+
+
 def bbb_check_frame_data(frame, arr, expected_keys):
     """Helper to compare frame data to numpy array."""
     # check if we have all the expected keys in the array (and only these)

@@ -155,7 +155,7 @@ def get_video_fname(camIdx, begin, end):
     return get_fname(camIdx, begin) + "--" + dt_to_str(end)
 
 
-def convert_frame_to_numpy(frame, keys=None):
+def convert_frame_to_numpy(frame, keys=None, add_cols=None):
     """Returns the frame data and detections as a numpy array from the frame.
 
     Note: the frame id is identified in the array as frameId instead of id!
@@ -163,23 +163,32 @@ def convert_frame_to_numpy(frame, keys=None):
     Args:
         frame (Frame): datastructure with frame data from capnp.
         keys (Optional tuple): only these keys are converted to the np array.
+        add_cols (Optional dictionary): additional columns for the np array,
+            use either a single value or a sequence of correct length.
     """
-    frame_arr = _convert_frame_to_numpy(frame, keys)
-    detection_arr = None
+    ret_arr = None
 
     if keys is None or 'detectionsUnion' in keys:
         detections = get_detections(frame)
-        detection_arr = _convert_detections_to_numpy(detections, keys)
+        ret_arr = _convert_detections_to_numpy(detections, keys)
 
-    if frame_arr is None:
-        return detection_arr
+    frame_arr = _convert_frame_to_numpy(frame, keys)
+    if ret_arr is not None and frame_arr is not None:
+        frame_arr = np.repeat(frame_arr, ret_arr.shape[0], axis=0)
+        ret_arr = rf.merge_arrays((frame_arr, ret_arr),
+                                  flatten=True, usemask=False)
 
-    if detection_arr is None:
-        return frame_arr
+    if ret_arr is not None and add_cols is not None:
+        for key, val in add_cols.items():
+            assert key not in keys, "{} not allowed in add_cols".format(key)
+            if hasattr(val, '__len__') and not isinstance(val, str):
+                msg = "{} has not length {}".format(key, ret_arr.shape[0])
+                assert len(val) == ret_arr.shape[0], msg
+            else:
+                val = np.repeat(val, ret_arr.shape[0], axis=0)
+            ret_arr = rf.append_fields(ret_arr, key, val, usemask=False)
 
-    frame_arr = np.repeat(frame_arr, len(detections), axis=0)
-    return rf.merge_arrays((frame_arr, detection_arr),
-                           flatten=True, usemask=False)
+    return ret_arr
 
 
 def _convert_frame_to_numpy(frame, keys=None):
@@ -630,6 +639,9 @@ class Repository(object):
             for frame in fc.frames:
                 if ((begin is None or begin <= frame.timestamp) and
                    (end is None or frame.timestamp < end)):
+                    # it seems to be more efficient to yield a FrameContainer
+                    # with frames, instead of extracting all the information
+                    # into another data structure.
                     yield frame, fc
 
     @staticmethod
