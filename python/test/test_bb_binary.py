@@ -145,6 +145,7 @@ def test_bbb_frame_container_from_truth_data(frame_truth_data):
     nDetections = len(frame.detectionsUnion.detectionsTruth)
 
     def convert_readability(df):
+        """Helper to convert readability column from binary to string."""
         df.readability = df.readability.apply(lambda x: x.decode('UTF-8'))
         return df
 
@@ -414,6 +415,41 @@ def test_bbb_repo_find_single_file_per_timestamp(tmpdir):
     assert repo.find(0)[0] == repo._get_filename(0, span, 0, 'bbb')
     assert repo.find(60*10)[0] == repo._get_filename(60*10, 60*10+span, 0, 'bbb')
     assert repo.find(1000000) == []
+
+
+def test_bbb_iter_frames_from_to(tmpdir):
+    """Tests that only frames in given range are iterated."""
+    repo = Repository(str(tmpdir.join('frames_from_to')))
+    repo_start = 0
+    nFrames = 10
+    span = 1000
+    repo_end = repo_start + nFrames * span
+    begin_end_cam_id = [(ts, ts + span, 0)
+                        for ts in range(repo_start, repo_end, span)]
+    for begin, end, cam_id in begin_end_cam_id:
+        fc = build_frame_container(begin, end, cam_id)
+        fc.init('frames', span)
+        for i, tstamp in enumerate(range(begin, end)):
+            frame = fc.frames[i]
+            frame.id = tstamp
+            frame.timestamp = tstamp
+        repo.add(fc)
+
+    def check_tstamp_invariant(begin, end):
+        """Helper to check if begin <= tstamp < end is true for all frames."""
+        for frame, _ in repo.iter_frames(begin, end):
+            assert begin <= frame.timestamp < end
+
+    # repo_start < start < end < repo_end
+    check_tstamp_invariant(repo_start + 10, repo_end - 10)
+    # start < repo_start < end < repo_end
+    check_tstamp_invariant(repo_start - 10, repo_end - 10)
+    # start < end < repo_start < repo_end
+    check_tstamp_invariant(repo_start - 20, repo_start - 10)
+    # repo_start < start < repo_end < end
+    check_tstamp_invariant(repo_start + 10, repo_end + 10)
+    # repo_start < repo_end < start < end
+    check_tstamp_invariant(repo_end + 10, repo_end + 20)
 
 
 def test_bbb_repo_iter_fnames_empty(tmpdir):

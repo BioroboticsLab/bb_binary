@@ -609,6 +609,29 @@ class Repository(object):
                     current_path, direction='forward')
                 current_path = self._join_with_repo_dir(current_path)
 
+    def iter_frames(self, begin=None, end=None, cam=None):
+        """
+        Returns a generator that yields filenames in sorted order.
+        From `begin` to `end`.
+
+        Args:
+            begin (Optional timestamp): select frames with begin <= timestamp.
+            Starts with smallest timestamp in repository if not set.
+            end (Optional timestamp): select frames with timestamp < end.
+            Ends with biggest timestamp in repository if not set.
+            cam (Optional int): only yield filenames with this cam id.
+
+        Returns:
+            iterator: iterator with Frames
+            FrameContainer: the corresponding FrameContainer for each frame.
+        """
+        for f in self.iter_fnames(begin=begin, end=end):
+            fc = load_frame_container(f)
+            for frame in fc.frames:
+                if ((begin is None or frame.timestamp <= begin) and
+                   (end is None or end < frame.timestamp)):
+                    yield frame, None
+
     @staticmethod
     def load(directory):
         """Load the repository from this directory."""
@@ -665,6 +688,8 @@ class Repository(object):
         def isfile_or_link(fname):
             return os.path.isfile(fname) or os.path.islink(fname)
         dirname = self._join_with_repo_dir(*paths)
+        if not os.path.isdir(dirname):
+            return []
         return [f for f in os.listdir(dirname)
                 if isfile_or_link(os.path.join(dirname, f))]
 
