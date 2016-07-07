@@ -49,10 +49,10 @@ struct DetectionTruth {
   decodedId @5 :UInt32;          # decoded id by human
   readability @6 :Grade;         # tags might be visible or (partially) obscured
   enum Grade {                   # ranks for evaluation of a tag's readability are:
-    completely @0;               #  - completely visible **and** human readable
-    partially @1;                #  - only partially visible and therefore **not** human readable
-    none @2;                     #  - **not** visible at all
-    unknown @3;                  #  - not considered or evaluted
+    unknown @0;                  #  - not considered or evaluted
+    completely @1;               #  - completely visible **and** human readable
+    partially @2;                #  - only partially visible and therefore **not** human readable
+    none @3;                     #  - **not** visible at all
   }
 }
 
