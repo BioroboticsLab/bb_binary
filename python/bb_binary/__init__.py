@@ -39,7 +39,7 @@ def to_timestamp(dt):
         return timestamp
 
 
-def mkdir_p(path):
+def _mkdir_p(path):
     try:
         os.makedirs(path)
     except OSError as exc:  # Python >2.5
@@ -313,31 +313,35 @@ def build_frame(
 ):
     """
     Builds a frame from a numpy array.
-    The structure of the numpy array:
-        idx
-        xpos
-        ypos
-        xposHive
-        yposHive
-        zRotation
-        yRotation
-        xRotation
-        radius
-        bit_0
-        bit_1
-        ...
-        bit_n
+    The columns of the ``detections`` array must be in this order:
+
+       * ``idx``
+       * ``xpos``
+       * ``ypos``
+       * ``xposHive``
+       * ``yposHive``
+       * ``zRotation``
+       * ``yRotation``
+       * ``xRotation``
+       * ``radius``
+       * ``bit_0``
+       * ``bit_1``
+       * ``...``
+       * ``bit_n``
+
 
     Usage (not tested):
-    ```
-    frames = [(timestamp, pipeline(image_to_timestamp))]
-    nb_frames = len(frames)
-    fc = FrameContainer.new_message()
-    frames_builder = fc.init('frames', len(frames))
-    for i, (timestamp, detections) in enumerate(frames):
-        build_frame(frame[i], timestamp, detections)
-    ```
+
+    .. code::
+
+        frames = [(timestamp, pipeline(image_to_timestamp))]
+        nb_frames = len(frames)
+        fc = FrameContainer.new_message()
+        frames_builder = fc.init('frames', len(frames))
+        for i, (timestamp, detections) in enumerate(frames):
+            build_frame(frame[i], timestamp, detections)
     """
+    # TODO: Use a structed numpy array
     assert detection_format == 'deeppipeline'
     frame.dataSourceIdx = int(data_source)
     frame.frameIdx = int(frame_idx)
@@ -513,7 +517,7 @@ class Repository(object):
             root_dir (str):  Path where the repository is created
         """
         self.root_dir = os.path.abspath(root_dir)
-        mkdir_p(self.root_dir)
+        _mkdir_p(self.root_dir)
         self.minute_step = minute_step
         if not os.path.exists(self._repo_json_fname()):
             self._save_json()
@@ -574,13 +578,15 @@ class Repository(object):
 
         Example:
 
+        .. code::
+
             Files:        A     B     C        D     E
             Frames:    |-----|-----|-----|  |-----|-----|
                             ⬆          ⬆
                           begin       end
 
-            This should return the files A, B and C.
-            If `begin` and `end` are `None`, then all will be yield.
+        This should return the files A, B and C.
+        If `begin` and `end` are `None`, then all will be yield.
         """
 
         def remove_links(directory, fnames):
@@ -767,7 +773,7 @@ class Repository(object):
             return self._path_for_dt(first_ts) != \
                 self._path_for_dt(end_dt)
         fname = self._get_filename(begin_dt, end_dt, cam_id, extension)
-        mkdir_p(os.path.dirname(fname))
+        _mkdir_p(os.path.dirname(fname))
         if not os.path.exists(fname):
             open(fname, 'a').close()
         iter_ts = end
@@ -778,7 +784,7 @@ class Repository(object):
                                             extension, path)
             symlinks.append(link_fname)
             link_dir = os.path.dirname(link_fname)
-            mkdir_p(link_dir)
+            _mkdir_p(link_dir)
             rel_goal = os.path.relpath(fname, start=link_dir)
             os.symlink(rel_goal, link_fname)
             iter_path = self._step_one_directory(iter_ts, 'backward')
