@@ -28,7 +28,7 @@ def test_bbb_relative_path():
 
 def test_dt_to_str():
     dt = datetime(2015, 8, 15, 12, 0, 40, 333967, tzinfo=pytz.utc)
-    assert dt_to_str(dt) == "20150815T120040.333Z"
+    assert dt_to_str(dt) == "2015-08-15T12:00:40.333967Z"
 
 
 def test_bbb_frame_from_detections():

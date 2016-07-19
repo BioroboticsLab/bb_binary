@@ -132,15 +132,15 @@ def to_datetime(t):
 
 def dt_to_str(dt):
     dt = to_datetime(dt)
-    isoformat = "%Y%m%dT%H%M%S"
+    isoformat = "%Y-%m-%dT%H:%M:%S"
 
     dt_str = dt.strftime(isoformat)
     if dt.microsecond != 0:
-        dt_str += ".{:03d}".format(dt.microsecond // 10**3)
+        dt_str += ".{:06d}".format(dt.microsecond)
     if dt.utcoffset().total_seconds() == 0:
         return dt_str + "Z"
     else:
-        return dt_str + dt.strftime("%z")
+        raise Exception("Got a datetime object not in UTC. Allways use UTC.")
 
 
 def get_fname(camIdx, dt):
