@@ -85,19 +85,30 @@ def parse_image_fname(fname, format='iso'):
         return parse_image_fname_iso(fname)
 
 
-def parse_video_fname(fname, format='beesbook'):
-    fname = os.path.basename(fname)
-    if format == 'beesbook':
-        begin_name, end_name = fname.split('_TO_')
-        (camIdx, begin) = parse_image_fname(begin_name, format)
-        (_, end) = parse_image_fname(end_name, format)
+def parse_video_fname(fname, format='auto'):
+    def beesbook_parse():
+        begin_name, end_name = basename.split('_TO_')
+        (camIdx, begin) = parse_image_fname(begin_name, 'beesbook')
+        (_, end) = parse_image_fname(end_name, 'beesbook')
         return camIdx, begin, end
-    elif format == 'iso':
-        fname, _ = os.path.splitext(fname)
-        _, camIdx, isotimespan = fname.split('_')
+
+    def iso_parse():
+        name, _ = os.path.splitext(basename)
+        _, camIdx, isotimespan = name.split('_')
         start, end = isotimespan.split('--')
         end = end.rstrip(".bbb")
         return int(camIdx), iso8601.parse_date(start), iso8601.parse_date(end)
+
+    basename = os.path.basename(fname)
+    if format == 'beesbook':
+        return beesbook_parse()
+    elif format == 'iso':
+        return iso_parse()
+    elif format == 'auto':
+        try:
+            return beesbook_parse()
+        except ValueError:
+            return iso_parse()
     else:
         raise ValueError("Unknown format {}.".format(format))
 

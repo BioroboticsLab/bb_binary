@@ -667,3 +667,17 @@ def test_parse_video_fname():
     camIdx, begin, end = parse_video_fname(fname, format='iso')
     assert begin == datetime.fromtimestamp(10*60, tz=pytz.utc)
     assert end == datetime.fromtimestamp(20*60, tz=pytz.utc)
+
+    fname = "Cam_0_1970-01-01T00:10:00.000000Z--1970-01-01T00:20:00.000000Z.bbb"
+    camIdx, begin, end = parse_video_fname(fname, format='auto')
+    assert begin == datetime.fromtimestamp(10*60, tz=pytz.utc)
+    assert end == datetime.fromtimestamp(20*60, tz=pytz.utc)
+
+
+    fname = "Cam_1_20160501160208_0_TO_Cam_1_20160501160748_0.bbb"
+    camIdx, begin, end = parse_video_fname(fname, format='auto')
+    begin_dt = datetime.fromtimestamp(begin)
+    assert camIdx == 1
+    assert begin_dt.year == 2016
+    assert begin_dt.month == 5
+
