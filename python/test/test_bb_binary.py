@@ -673,11 +673,9 @@ def test_parse_video_fname():
     assert begin == datetime.fromtimestamp(10*60, tz=pytz.utc)
     assert end == datetime.fromtimestamp(20*60, tz=pytz.utc)
 
-
     fname = "Cam_1_20160501160208_0_TO_Cam_1_20160501160748_0.bbb"
     camIdx, begin, end = parse_video_fname(fname, format='auto')
     begin_dt = datetime.fromtimestamp(begin)
     assert camIdx == 1
     assert begin_dt.year == 2016
     assert begin_dt.month == 5
-
