@@ -650,6 +650,13 @@ def test_bbb_repo_open_frame_container(tmpdir):
 
 
 def test_parse_video_fname():
+    # sometimes images have two underscores
+    fname = "Cam_1_20160501160208__5_TO_Cam_1_20160501160748__1.avi"
+    camIdx, begin, end = parse_video_fname(fname, format='beesbook')
+    begin_dt = datetime.fromtimestamp(begin)
+    assert camIdx == 1
+    assert begin_dt.year == 2016
+
     fname = "Cam_1_20160501160208_958365_TO_Cam_1_20160501160748_811495.avi"
     camIdx, begin, end = parse_video_fname(fname, format='beesbook')
     begin_dt = datetime.fromtimestamp(begin)

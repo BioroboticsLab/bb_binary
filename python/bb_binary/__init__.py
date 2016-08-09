@@ -52,6 +52,7 @@ def _mkdir_p(path):
 def parse_image_fname_beesbook(fname):
     basename = os.path.basename(fname)
     name = basename.split('.')[0]
+    name = name.replace('__', '_')
     _, camIdxStr, datetimeStr, usStr = name.split('_')
 
     camIdx = int(camIdxStr)
