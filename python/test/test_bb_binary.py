@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from conftest import fill_repository
 from bb_binary import build_frame_container, parse_video_fname, Frame, \
-    Repository,  build_frame, dt_to_str, convert_frame_to_numpy, \
+    Repository, build_frame, dt_to_str, convert_frame_to_numpy, \
     _convert_detections_to_numpy, _convert_frame_to_numpy, get_detections, \
     build_truth_frame_container, to_datetime
 
@@ -37,7 +37,7 @@ def test_bbb_frame_from_detections():
     frame_idx = 10
     detections = np.array([
         [0, 24, 43, 243, 234, 1, 0.1, 0.4, 0.1, 0.3] + [0.9] * 12,
-        [1, 324, 543, 243, 234, 1,  0.1, 0.4, 0.1, 0.3] + [0.2] * 12,
+        [1, 324, 543, 243, 234, 1, 0.1, 0.4, 0.1, 0.3] + [0.2] * 12,
     ])
 
     build_frame(frame, timestamp, detections, frame_idx)
@@ -549,9 +549,9 @@ def test_bbb_repo_iter_fnames_from_to(tmpdir):
     slice_begin_end_cam_id = list(filter(lambda p: begin <= p[1] and p[0] < end,
                                          begin_end_cam_id))
     print(slice_begin_end_cam_id)
-    expected_fnames = [os.path.basename(
-        repo._get_filename(*p, extension='bbb'))
-                       for p in slice_begin_end_cam_id]
+    expected_fnames = [
+        os.path.basename(repo._get_filename(*p, extension='bbb'))
+        for p in slice_begin_end_cam_id]
     print(expected_fnames)
     print(fbasenames)
     assert fbasenames == expected_fnames
@@ -577,9 +577,9 @@ def test_bbb_repo_iter_fnames_from_to_and_cam(tmpdir):
     slice_begin_end_cam_id = list(filter(
         lambda p: begin <= p[1] and p[0] < end and p[2] == cam,
         begin_end_cam_id))
-    expected_fnames = [os.path.basename(
-        repo._get_filename(*p, extension='bbb'))
-                       for p in slice_begin_end_cam_id]
+    expected_fnames = [
+        os.path.basename(repo._get_filename(*p, extension='bbb'))
+        for p in slice_begin_end_cam_id]
     assert fbasenames == expected_fnames
 
 

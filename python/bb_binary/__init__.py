@@ -157,10 +157,7 @@ def dt_to_str(dt):
 
 def get_fname(camIdx, dt):
     dt = to_datetime(dt)
-    return ("Cam_{cam}_{ts}").format(
-                cam=camIdx,
-                ts=dt_to_str(dt)
-            )
+    return ("Cam_{cam}_{ts}").format(cam=camIdx, ts=dt_to_str(dt))
 
 
 def get_video_fname(camIdx, begin, end):
@@ -445,8 +442,8 @@ def build_truth_frame_container(df, cam_id, frame_offset=0):
     if 'datetime' in df.dtypes.timestamp.name:
         df.timestamp = df.timestamp.apply(
             lambda t: to_timestamp(datetime(
-                        t.year, t.month, t.day, t.hour, t.minute, t.second,
-                        t.microsecond, tzinfo=pytz.utc)))
+                t.year, t.month, t.day, t.hour, t.minute, t.second,
+                t.microsecond, tzinfo=pytz.utc)))
 
     # select only entries for cam
     if 'camId' in df.keys():
