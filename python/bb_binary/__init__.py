@@ -78,12 +78,19 @@ def parse_image_fname_iso(fname):
     return int(camIdxStr), dt
 
 
-def parse_image_fname(fname, format='iso'):
-    assert format in ['beesbook', 'iso']
+def parse_image_fname(fname, format='auto'):
     if format == 'beesbook':
         return parse_image_fname_beesbook(fname)
-    else:
+    elif format == 'iso':
         return parse_image_fname_iso(fname)
+    elif format == 'auto':
+        basename = os.path.basename(fname)
+        if basename.count('_') >= 3:
+            return parse_image_fname_beesbook(fname)
+        else:
+            return parse_image_fname_iso(fname)
+    else:
+        raise Exception("Unknown format {}.".format(format))
 
 
 def parse_video_fname(fname, format='auto'):
