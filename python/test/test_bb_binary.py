@@ -653,22 +653,19 @@ def test_parse_video_fname():
     # sometimes images have two underscores
     fname = "Cam_1_20160501160208__5_TO_Cam_1_20160501160748__1.avi"
     camIdx, begin, end = parse_video_fname(fname, format='beesbook')
-    begin_dt = datetime.fromtimestamp(begin)
     assert camIdx == 1
-    assert begin_dt.year == 2016
+    assert begin.year == 2016
 
     fname = "Cam_1_20160501160208_958365_TO_Cam_1_20160501160748_811495.avi"
     camIdx, begin, end = parse_video_fname(fname, format='beesbook')
-    begin_dt = datetime.fromtimestamp(begin)
     assert camIdx == 1
-    assert begin_dt.year == 2016
+    assert begin.year == 2016
 
     fname = "Cam_1_20160501160208_0_TO_Cam_1_20160501160748_0.bbb"
     camIdx, begin, end = parse_video_fname(fname, format='beesbook')
-    begin_dt = datetime.fromtimestamp(begin)
     assert camIdx == 1
-    assert begin_dt.year == 2016
-    assert begin_dt.month == 5
+    assert begin.year == 2016
+    assert begin.month == 5
 
     fname = "Cam_0_19700101T001000.000000Z--19700101T002000.000000Z.bbb"
     camIdx, begin, end = parse_video_fname(fname, format='iso')
@@ -682,7 +679,6 @@ def test_parse_video_fname():
 
     fname = "Cam_1_20160501160208_0_TO_Cam_1_20160501160748_0.bbb"
     camIdx, begin, end = parse_video_fname(fname, format='auto')
-    begin_dt = datetime.fromtimestamp(begin)
     assert camIdx == 1
-    assert begin_dt.year == 2016
-    assert begin_dt.month == 5
+    assert begin.year == 2016
+    assert begin.month == 5

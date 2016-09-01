@@ -66,8 +66,8 @@ def parse_image_fname_beesbook(fname):
     us = int(usStr)
 
     dt = datetime(year, month, day, hour, minute, second, us)
-    ts = to_timestamp(get_timezone().localize(dt))
-    return camIdx, ts
+    dt = get_timezone().localize(dt)
+    return camIdx, dt.astimezone(pytz.utc)
 
 
 def parse_image_fname_iso(fname):
