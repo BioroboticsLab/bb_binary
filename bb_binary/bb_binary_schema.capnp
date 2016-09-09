@@ -46,7 +46,7 @@ struct DetectionTruth {
   ypos @2 :UInt16;               # y coordinate of the grid center wrt. the image
   xposHive @3 :UInt16;           # x coordinate of the grid center wrt. the hive
   yposHive @4 :UInt16;           # y coordinate of the grid center wrt. the hive
-  decodedId @5 :UInt32;          # decoded id by human
+  decodedId @5 :Int32;           # decoded id by human
   readability @6 :Grade;         # tags might be visible or (partially) obscured
   enum Grade {                   # ranks for evaluation of a tag's readability are:
     unknown @0;                  #  - not considered or evaluted
