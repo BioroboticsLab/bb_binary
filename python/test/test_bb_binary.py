@@ -3,7 +3,7 @@ from conftest import fill_repository
 from bb_binary import build_frame_container, parse_video_fname, Frame, \
     Repository, build_frame, dt_to_str, convert_frame_to_numpy, \
     _convert_detections_to_numpy, _convert_frame_to_numpy, get_detections, \
-    build_truth_frame_container, to_datetime
+    build_truth_frame_container, to_datetime, int_id_to_binary
 
 import time
 from datetime import datetime
@@ -29,6 +29,19 @@ def test_bbb_relative_path():
 def test_dt_to_str():
     dt = datetime(2015, 8, 15, 12, 0, 40, 333967, tzinfo=pytz.utc)
     assert dt_to_str(dt) == "2015-08-15T12:00:40.333967Z"
+
+
+def test_int_id_to_binary():
+    bit_arr = int_id_to_binary(8)
+    assert np.all(bit_arr == np.array([0, 0, 0, 0, 0, 0,
+                                       0, 0, 1, 0, 0, 0], dtype=np.uint8))
+
+    bit_arr = int_id_to_binary(4095)
+    assert np.all(bit_arr == np.array([1, 1, 1, 1, 1, 1,
+                                       1, 1, 1, 1, 1, 1], dtype=np.uint8))
+
+    with pytest.raises(Exception):  # to big value
+        bit_arr = int_id_to_binary(8096)
 
 
 def test_bbb_frame_from_detections():

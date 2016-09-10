@@ -171,6 +171,18 @@ def get_video_fname(camIdx, begin, end):
     return get_fname(camIdx, begin) + "--" + dt_to_str(end)
 
 
+def int_id_to_binary(id, nb_bits=12):
+    result = np.zeros(nb_bits, dtype=np.uint8)
+    if id >= 2**nb_bits:
+        raise Exception("Id overflows {} bits".format(nb_bits))
+    a = nb_bits - 1
+    while id:
+        result[a] = id & 1
+        id >>= 1
+        a -= 1
+    return result
+
+
 def convert_frame_to_numpy(frame, keys=None, add_cols=None):
     """Returns the frame data and detections as a numpy array from the frame.
 
