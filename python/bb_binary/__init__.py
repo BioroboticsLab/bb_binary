@@ -11,6 +11,8 @@ import iso8601
 import pytz
 import six
 
+# TODO: Add warning about windows symlinks
+
 
 capnp.remove_import_hook()
 _dirname = os.path.dirname(os.path.realpath(__file__))
@@ -24,6 +26,11 @@ DetectionDP = bbb.DetectionDP
 DetectionTruth = bbb.DetectionTruth
 
 _TIMEZONE = pytz.timezone('Europe/Berlin')
+
+CAM_IDX = 0
+BEGIN_IDX = 1
+TIME_IDX = 1
+END_IDX = 2
 
 
 def get_timezone():
@@ -176,7 +183,7 @@ def int_id_to_binary(id, nb_bits=12):
     if id >= 2**nb_bits:
         raise Exception("Id overflows {} bits".format(nb_bits))
     a = nb_bits - 1
-    while id:
+    while a >= 0:
         result[a] = id & 1
         id >>= 1
         a -= 1
@@ -310,76 +317,6 @@ def get_detections(frame):
     else:
         raise KeyError("Type {0} not supported.".format(union_type))
     return detections
-
-
-def nb_parameters(nb_bits):
-    """Returns the number of parameter of the detections."""
-    return _detection_dp_fields_before_ids + nb_bits
-
-
-_detection_dp_fields_before_ids = 9
-
-
-def build_frame(
-        frame,
-        timestamp,
-        detections,
-        frame_idx,
-        data_source=0,
-        detection_format='deeppipeline'
-):
-    """
-    Builds a frame from a numpy array.
-    The columns of the ``detections`` array must be in this order:
-
-       * ``idx``
-       * ``xpos``
-       * ``ypos``
-       * ``xposHive``
-       * ``yposHive``
-       * ``zRotation``
-       * ``yRotation``
-       * ``xRotation``
-       * ``radius``
-       * ``bit_0``
-       * ``bit_1``
-       * ``...``
-       * ``bit_n``
-
-
-    Usage (not tested):
-
-    .. code::
-
-        frames = [(timestamp, pipeline(image_to_timestamp))]
-        nb_frames = len(frames)
-        fc = FrameContainer.new_message()
-        frames_builder = fc.init('frames', len(frames))
-        for i, (timestamp, detections) in enumerate(frames):
-            build_frame(frame[i], timestamp, detections)
-    """
-    # TODO: Use a structed numpy array
-    assert detection_format == 'deeppipeline'
-    frame.dataSourceIdx = int(data_source)
-    frame.frameIdx = int(frame_idx)
-    detec_builder = frame.detectionsUnion.init('detectionsDP',
-                                               len(detections))
-    for i, detection in enumerate(detections):
-        detec_builder[i].idx = int(detection[0])
-        detec_builder[i].xpos = int(detection[1])
-        detec_builder[i].ypos = int(detection[2])
-        detec_builder[i].xposHive = int(detection[3])
-        detec_builder[i].yposHive = int(detection[4])
-        detec_builder[i].zRotation = float(detection[5])
-        detec_builder[i].yRotation = float(detection[6])
-        detec_builder[i].xRotation = float(detection[7])
-        detec_builder[i].radius = float(detection[8])
-
-        nb_ids = len(detection) - _detection_dp_fields_before_ids
-        decodedId = detec_builder[i].init('decodedId', nb_ids)
-        for j, bit in enumerate(
-                detections[i, _detection_dp_fields_before_ids:]):
-            decodedId[j] = int(round(255*bit))
 
 
 def build_frame_container(from_ts, to_ts, cam_id,
@@ -518,6 +455,15 @@ def load_frame_container(fname):
         return FrameContainer.read(f)
 
 
+class TimeInterval(object):
+    def __init__(self, begin, end):
+        self.begin = begin
+        self.end = end
+
+    def in_interval(self, dt):
+        return self.begin <= dt < self.end
+
+
 class Repository(object):
     """
     The Repository class manages multiple bb_binary files. It creates a
@@ -526,18 +472,34 @@ class Repository(object):
 
     _CONFIG_FNAME = '.bbb_repo_config.json'
 
-    def __init__(self, root_dir, minute_step=20):
+    def __init__(self, root_dir, minute_step=None):
         """
         Creates a new repository at `root_dir`.
 
         Args:
             root_dir (str):  Path where the repository is created
+            minute_step (int): Number of minutes that spans a directory. Default: 20
         """
         self.root_dir = os.path.abspath(root_dir)
-        _mkdir_p(self.root_dir)
-        self.minute_step = minute_step
-        if not os.path.exists(self._repo_json_fname()):
-            self._save_json()
+        config_fname = os.path.join(self.root_dir, Repository._CONFIG_FNAME)
+        if os.path.exists(config_fname):
+            if minute_step is not None:
+                raise Exception(
+                    "Got repo at {} with existing config file {}, but also "
+                    "got minute_step {}."
+                    .format(self.root_dir, self._CONFIG_FNAME, minute_step))
+
+            with open(config_fname) as f:
+                config = json.load(f)
+            self.minute_step = config['minute_step']
+        else:
+            _mkdir_p(self.root_dir)
+            if minute_step is None:
+                minute_step = 20
+
+            self.minute_step = minute_step
+            if not os.path.exists(self._repo_json_fname()):
+                self._save_json()
 
     def add(self, frame_container):
         """
@@ -564,17 +526,18 @@ class Repository(object):
     def find(self, ts, cam=None):
         """
         Returns all files that includes detections to the given timestamp `ts`.
+        TODO: UTC timestamps! Generall
         """
         dt = to_datetime(ts)
         path = self._path_for_dt(dt)
         if not os.path.exists(self._join_with_repo_dir(path)):
             return []
         fnames = self._all_files_in(path)
-        parts = [self._parse_repo_fname(f) for f in fnames]
+        fnames_parts = [(f, self._parse_repo_fname(f)) for f in fnames]
         if cam is not None:
-            parts = list(filter(lambda p: p[0] == cam, parts))
+            fnames_parts = list(filter(lambda f, p: p[CAM_IDX] == cam, fnames_parts))
         found_files = []
-        for (camId, begin, end), fname in zip(parts, fnames):
+        for fname, (camId, begin, end) in fnames_parts:
             if begin <= dt < end:
                 found_files.append(self._join_with_repo_dir(path, fname))
         return found_files
@@ -607,6 +570,8 @@ class Repository(object):
         """
 
         def remove_links(directory, fnames):
+            assert os.path.isdir(directory)
+            assert os.path.isabs(directory)
             return list(filter(
                 lambda f: not os.path.islink(os.path.join(directory, f)),
                 fnames))
@@ -614,10 +579,12 @@ class Repository(object):
         if begin is None:
             current_path = self._get_earliest_path()
             begin = pytz.utc.localize(datetime.min)
+
         else:
             begin = to_datetime(begin)
             current_path = self._path_for_dt(begin, abs=True)
 
+        # if the repository is empty, current_path is the root_dir
         if current_path == self.root_dir:
             return
 
@@ -628,6 +595,7 @@ class Repository(object):
             end = to_datetime(end)
             end_dir = self._path_for_dt(end, abs=True)
 
+        iter_range = TimeInterval(begin, end)
         first_directory = True
         while True:
             fnames = self._all_files_in(current_path)
@@ -639,12 +607,12 @@ class Repository(object):
             parsed_fname = [self._parse_repo_fname(f) for f in fnames]
             cam_id_begin_end_fnames = [(c, b, e, f) for (c, b, e), f in zip(parsed_fname, fnames)]
             if cam is not None:
-                cam_id_begin_end_fnames = list(filter(lambda p: p[0] == cam,
+                cam_id_begin_end_fnames = list(filter(lambda p: p[CAM_IDX] == cam,
                                                       cam_id_begin_end_fnames))
 
-            cam_id_begin_end_fnames.sort(key=lambda p: p[1])
+            cam_id_begin_end_fnames.sort(key=lambda p: p[BEGIN_IDX])
             for cam_idx, begin_ts, end_ts, fname in cam_id_begin_end_fnames:
-                if begin <= end_ts and begin_ts < end:
+                if iter_range.in_interval(begin_ts) or iter_range.in_interval(end_ts):
                     yield self._join_with_repo_dir(current_path, fname)
 
             if end_dir == current_path:
@@ -656,7 +624,7 @@ class Repository(object):
 
     def iter_frames(self, begin=None, end=None, cam=None):
         """
-        Returns a generator that yields filenames in sorted order.
+        Yields frames in sorted order.
         From `begin` to `end`.
 
         Args:
@@ -670,7 +638,7 @@ class Repository(object):
             iterator: iterator with Frames
             FrameContainer: the corresponding FrameContainer for each frame.
         """
-        for f in self.iter_fnames(begin=begin, end=end):
+        for f in self.iter_fnames(begin=begin, end=end, cam=cam):
             fc = load_frame_container(f)
             for frame in fc.frames:
                 if ((begin is None or begin <= frame.timestamp) and
@@ -680,34 +648,23 @@ class Repository(object):
                     # into another data structure.
                     yield frame, fc
 
-    @staticmethod
-    def load(directory):
-        """Load the repository from this directory."""
-        config_fname = os.path.join(directory, Repository._CONFIG_FNAME)
-        assert config_fname, \
-            "Tries to load directory: {}, but file {} is missing".\
-            format(directory, config_fname)
-        with open(config_fname) as f:
-            config = json.load(f)
-        config['root_dir'] = directory
-        return Repository(**config)
-
-    def __eq__(self, other):
-        return self._to_config() == other._to_config()
-
     def _save_json(self):
         with open(self._repo_json_fname(), 'w+') as f:
             json.dump(self._to_config(), f)
 
+    _DIR_FORMAT = "{:04d}/{:02d}/{:02d}/{:02d}/{:02d}"
+    _DIR_FORMAT_PARTS = _DIR_FORMAT.split('/')
+
     def _path_for_dt(self, time, abs=False):
         dt = to_datetime(time)
         minutes = int(math.floor(dt.minute / self.minute_step) * self.minute_step)
-        path = "{:04d}/{:02d}/{:02d}/{:02d}/{:02d}".format(
-            dt.year, dt.month, dt.day, dt.hour, minutes)
+        values = (dt.year, dt.month, dt.day, dt.hour, minutes)
+        format_parts = list(map(lambda t: t[0].format(t[1]),
+                                zip(self._DIR_FORMAT_PARTS, values)))
         if abs:
-            return self._join_with_repo_dir(path)
+            return self._join_with_repo_dir(*format_parts)
         else:
-            return path
+            return os.path.join(*format_parts)
 
     def _get_directory(self, selection_fn):
         def directories(dirname):
@@ -732,18 +689,26 @@ class Repository(object):
     def _join_with_repo_dir(self, *paths):
         return os.path.join(self.root_dir, *paths)
 
-    def _all_files_in(self, *paths):
+    def _all_files_in(self, path):
+        assert type(path) == str
+
         def isfile_or_link(fname):
             return os.path.isfile(fname) or os.path.islink(fname)
-        dirname = self._join_with_repo_dir(*paths)
+        dirname = self._join_with_repo_dir(path)
         if not os.path.isdir(dirname):
             return []
         return [f for f in os.listdir(dirname)
                 if isfile_or_link(os.path.join(dirname, f))]
 
     def _get_time_from_path(self, path):
-        path = path.rstrip('/\\')
-        time_parts_str = path.split('/')[-5:]
+        path = os.path.normpath(path)
+        if path.startswith(self.root_dir):
+            path = path[len(self.root_dir)+1:]
+        time_parts_str = path.split(os.path.sep)
+        if len(time_parts_str) > 5:
+            raise Exception(
+                "A path must be of format {}. But got {} with {} parts.".
+                format(self._DIR_FORMAT, path, len(time_parts_str)))
         time_parts = list(map(int, time_parts_str))
         return datetime(*time_parts, tzinfo=pytz.utc)
 
@@ -780,6 +745,7 @@ class Repository(object):
             current_path = self._step_one_directory(current_path, direction)
             if os.path.exists(self._join_with_repo_dir(current_path)):
                 return current_path
+            # TODO: loop forever?
 
     def _create_file_and_symlinks(self, begin, end, cam_id,
                                   extension=''):
@@ -824,7 +790,6 @@ class Repository(object):
 
     def _to_config(self):
         return {
-            'root_dir': self.root_dir,
             'minute_step': self.minute_step,
         }
 

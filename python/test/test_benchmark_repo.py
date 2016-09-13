@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 from conftest import fill_repository
-from bb_binary import build_frame_container, Repository, build_frame, \
-    nb_parameters
+from bb_binary import build_frame_container, Repository
 
 import time
 import numpy as np
@@ -42,6 +41,76 @@ def test_benchmark_find(benchmark, example_experiment_repo):
         ts = random.randint(begin, end)
         repo.find(ts)
     benchmark(find)
+
+
+_detection_dp_fields_before_ids = 9
+
+
+def build_frame(
+        frame,
+        timestamp,
+        detections,
+        frame_idx,
+        data_source=0,
+        detection_format='deeppipeline'
+):
+    """
+    Builds a frame from a numpy array.
+    The columns of the ``detections`` array must be in this order:
+
+       * ``idx``
+       * ``xpos``
+       * ``ypos``
+       * ``xposHive``
+       * ``yposHive``
+       * ``zRotation``
+       * ``yRotation``
+       * ``xRotation``
+       * ``radius``
+       * ``bit_0``
+       * ``bit_1``
+       * ``...``
+       * ``bit_n``
+
+
+    Usage (not tested):
+
+    .. code::
+
+        frames = [(timestamp, pipeline(image_to_timestamp))]
+        nb_frames = len(frames)
+        fc = FrameContainer.new_message()
+        frames_builder = fc.init('frames', len(frames))
+        for i, (timestamp, detections) in enumerate(frames):
+            build_frame(frame[i], timestamp, detections)
+    """
+    # TODO: Use a structed numpy array
+    assert detection_format == 'deeppipeline'
+    frame.dataSourceIdx = int(data_source)
+    frame.frameIdx = int(frame_idx)
+    detec_builder = frame.detectionsUnion.init('detectionsDP',
+                                               len(detections))
+    for i, detection in enumerate(detections):
+        detec_builder[i].idx = int(detection[0])
+        detec_builder[i].xpos = int(detection[1])
+        detec_builder[i].ypos = int(detection[2])
+        detec_builder[i].xposHive = int(detection[3])
+        detec_builder[i].yposHive = int(detection[4])
+        detec_builder[i].zRotation = float(detection[5])
+        detec_builder[i].yRotation = float(detection[6])
+        detec_builder[i].xRotation = float(detection[7])
+        detec_builder[i].radius = float(detection[8])
+
+        nb_ids = len(detection) - _detection_dp_fields_before_ids
+        decodedId = detec_builder[i].init('decodedId', nb_ids)
+        for j, bit in enumerate(
+                detections[i, _detection_dp_fields_before_ids:]):
+            decodedId[j] = int(round(255*bit))
+
+
+def nb_parameters(nb_bits):
+    """Returns the number of parameter of the detections."""
+    return _detection_dp_fields_before_ids + nb_bits
 
 
 @pytest.mark.slow

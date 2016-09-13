@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
 from conftest import fill_repository
-from bb_binary import build_frame_container, parse_video_fname, Frame, \
-    Repository, build_frame, dt_to_str, convert_frame_to_numpy, \
+from bb_binary import build_frame_container, parse_video_fname, parse_image_fname, \
+    Frame, Repository, dt_to_str, convert_frame_to_numpy, \
     _convert_detections_to_numpy, _convert_frame_to_numpy, get_detections, \
     build_truth_frame_container, to_datetime, int_id_to_binary
 
-import time
 from datetime import datetime
 import pytz
 import numpy as np
@@ -42,36 +41,6 @@ def test_int_id_to_binary():
 
     with pytest.raises(Exception):  # to big value
         bit_arr = int_id_to_binary(8096)
-
-
-def test_bbb_frame_from_detections():
-    frame = Frame.new_message()
-    timestamp = time.time()
-    frame_idx = 10
-    detections = np.array([
-        [0, 24, 43, 243, 234, 1, 0.1, 0.4, 0.1, 0.3] + [0.9] * 12,
-        [1, 324, 543, 243, 234, 1, 0.1, 0.4, 0.1, 0.3] + [0.2] * 12,
-    ])
-
-    build_frame(frame, timestamp, detections, frame_idx)
-    capnp_detections = frame.detectionsUnion.detectionsDP
-
-    assert frame.frameIdx == frame_idx
-    assert frame.dataSourceIdx == 0
-    for i in range(len(detections)):
-        assert capnp_detections[i].xpos == detections[i, 1]
-        assert capnp_detections[i].ypos == detections[i, 2]
-        assert capnp_detections[i].xposHive == detections[i, 3]
-        assert capnp_detections[i].yposHive == detections[i, 4]
-        assert np.allclose(capnp_detections[i].zRotation, detections[i, 5])
-        assert np.allclose(capnp_detections[i].yRotation, detections[i, 6])
-        assert np.allclose(capnp_detections[i].xRotation, detections[i, 7])
-        assert np.allclose(capnp_detections[i].radius, detections[i, 8])
-        assert np.allclose(
-            np.array(list(capnp_detections[i].decodedId)) / 255.,
-            detections[i, 9:],
-            atol=0.5/255.,
-        )
 
 
 @pytest.fixture
@@ -395,11 +364,11 @@ def test_bbb_get_detections(frame_data, frame_dp_data, frame_cvp_data):
 
 
 def test_bbb_repo_save_json(tmpdir):
-    repo = Repository(str(tmpdir), 0)
+    repo = Repository(str(tmpdir), 24)
     assert tmpdir.join(Repository._CONFIG_FNAME).exists()
 
-    loaded_repo = Repository.load(str(tmpdir))
-    assert repo == loaded_repo
+    loaded_repo = Repository(str(tmpdir))
+    assert loaded_repo.minute_step == repo.minute_step
 
 
 def test_bbb_repo_path_for_ts(tmpdir):
@@ -660,6 +629,15 @@ def test_bbb_repo_open_frame_container(tmpdir):
     open_fc = repo.open(2000, 1)
     assert fc.fromTimestamp == open_fc.fromTimestamp
     assert fc.toTimestamp == open_fc.toTimestamp
+
+
+def test_parse_image_fname():
+    camIdx, ts = parse_image_fname('Cam_0_20140805151756_200.jpeg')
+    assert ts.hour == 13  # two ours differenct due to utc / etc
+    assert ts.year == 2014
+    assert ts.minute == 17
+    assert ts.second == 56
+    assert ts.microsecond == 200
 
 
 def test_parse_video_fname():
