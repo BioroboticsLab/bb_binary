@@ -19,5 +19,10 @@ setup(
     dependency_links=dep_links,
     packages=['bb_binary'],
     package_dir={'': 'python'},
-    package_data={'bb_binary': ['*.capnp']}
+    package_data={'bb_binary': ['*.capnp']},
+    entry_points={
+        'console_scripts': [
+            'bb_gt_to_hdf5 = bb_binary.gt_to_hdf5:run',
+        ]
+    }
 )
