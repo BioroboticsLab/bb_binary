@@ -37,6 +37,8 @@ struct DetectionDP {
   localizerSaliency @9 :Float32; # saliency of the localizer network
   decodedId @10 :List(UInt8);    # the decoded id, the bit probabilities are discretised to 0-255.
                                  # p(first bit == 1) = decodedId[0] / 255
+  descriptor @11 :List(UInt8);   # visual descriptor of the detection. ordered from most
+                                 # significant eight bits to least significant eight bits.
 }
 
 struct DetectionTruth {
