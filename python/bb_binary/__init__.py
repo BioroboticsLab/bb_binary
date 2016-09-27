@@ -284,6 +284,8 @@ def _convert_detections_to_numpy(detections, keys=None):
     readability_key = 'readability'
     decoded_id_key = 'decodedId'
     decoded_id_index = None
+    descriptor_key = 'descriptor'
+    descriptor_index = None
     if decoded_id_key in keys and isinstance(detection0[decoded_id_key], list):
         # special handling of decodedId as float array in CP pipeline data
         decoded_id_index = keys.index(decoded_id_key)
@@ -292,7 +294,10 @@ def _convert_detections_to_numpy(detections, keys=None):
         # special handling of enum because numpy does not determine str length
         readbility_index = keys.index(readability_key)
         formats[readbility_index] = 'S10'
-
+    if descriptor_key in keys and isinstance(detection0[descriptor_key], list):
+        # special handling of descriptor as uint8 array in CP pipeline data
+        descriptor_index = keys.index(descriptor_key)
+        formats[descriptor_index] = str(len(detection0[descriptor_key])) + 'u8'
     detection_arr = np.empty(nrows, dtype={'names': keys, 'formats': formats})
     for i, detection in enumerate(detections):
         # make sure we have the same order as in keys
