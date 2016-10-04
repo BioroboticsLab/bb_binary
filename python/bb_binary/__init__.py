@@ -371,10 +371,8 @@ def build_frame_container_from_df(df, union_type, cam_id, frame_offset=0):
     Operates differently from `build_frame_container` because it will be used
     in a different context where we have access to more data.
 
-    The minimal set of expected column names in `df` are listed in
-    `minimal_keyset`. Column names are matched to `Frame` and `Detection*`
-    attributes. Set additional `FrameContainer` attributes like `hiveId` in
-    the return value.
+    Column names are matched to `Frame` and `Detection*` attributes.
+    Set additional `FrameContainer` attributes like `hiveId` in the return value.
 
     Args:
         df (dataframe): dataframe with detection data
@@ -392,9 +390,6 @@ def build_frame_container_from_df(df, union_type, cam_id, frame_offset=0):
         if type(val).__module__ == np.__name__:
             val = np.asscalar(val)
         setattr(obj, key, val)
-
-    # start with removing untracked data
-    #df = df.dropna().copy()
 
     detection = {
         'detectionsCVP': DetectionCVP.new_message(),
