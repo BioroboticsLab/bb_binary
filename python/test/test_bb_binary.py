@@ -3,7 +3,7 @@ from conftest import fill_repository
 from bb_binary import build_frame_container, parse_video_fname, parse_image_fname, \
     Frame, Repository, dt_to_str, convert_frame_to_numpy, \
     _convert_detections_to_numpy, _convert_frame_to_numpy, get_detections, \
-    build_truth_frame_container, to_datetime, int_id_to_binary
+    build_frame_container_from_df, to_datetime, int_id_to_binary
 
 from datetime import datetime
 import pytz
@@ -135,7 +135,7 @@ def test_bbb_frame_container_from_truth_data(frame_truth_data):
     offset = 0
 
     # test minimal set
-    fc, offset = build_truth_frame_container(truth_detections, offset)
+    fc, offset = build_frame_container_from_df(truth_detections, 'detectionsTruth', offset)
     assert offset == 1
     assert fc.id == 0
     assert fc.camId == 0
@@ -155,7 +155,7 @@ def test_bbb_frame_container_from_truth_data(frame_truth_data):
 
     # test without readability
     df = truth_detections.drop('readability', axis=1)
-    fc, offset = build_truth_frame_container(df, offset, frame_offset=offset)
+    fc, offset = build_frame_container_from_df(df, 'detectionsTruth', offset, frame_offset=offset)
     assert offset == 2  # test offset and id to test for fixed assignments
     assert fc.id == 1
     assert fc.camId == 1
@@ -171,7 +171,7 @@ def test_bbb_frame_container_from_truth_data(frame_truth_data):
     # test with datetime instead of unixtimestamp
     df = truth_detections
     df.timestamp = df.timestamp.apply(lambda x: to_datetime(x))
-    fc, offset = build_truth_frame_container(df, offset, frame_offset=offset)
+    fc, offset = build_frame_container_from_df(df, 'detectionsTruth', offset, frame_offset=offset)
     assert offset == 3
     fc.fromTimestamp == truth_detections.timestamp[0]
     assert len(fc.frames) == 1
@@ -179,7 +179,7 @@ def test_bbb_frame_container_from_truth_data(frame_truth_data):
     # test with additional column for frames
     df = truth_detections
     df['dataSourceIdx'] = 99
-    fc, offset = build_truth_frame_container(df, offset, frame_offset=offset)
+    fc, offset = build_frame_container_from_df(df, 'detectionsTruth', offset, frame_offset=offset)
     assert offset == 4
     assert len(fc.frames) == 1
 
@@ -189,7 +189,7 @@ def test_bbb_frame_container_from_truth_data(frame_truth_data):
     # test with additional column for detections
     df = truth_detections
     df['xposHive'] = range(0, nDetections)
-    fc, offset = build_truth_frame_container(df, offset, frame_offset=offset)
+    fc, offset = build_frame_container_from_df(df, 'detectionsTruth', offset, frame_offset=offset)
     assert offset == 5
     assert len(fc.frames) == 1
 
@@ -197,22 +197,12 @@ def test_bbb_frame_container_from_truth_data(frame_truth_data):
     for i in range(0, nDetections):
         assert detections[i].xposHive == df.xposHive[i]
 
-    # test with NA values
-    df = truth_detections
-    df.decodedId[0] = None
-    fc, offset = build_truth_frame_container(df, offset, frame_offset=offset)
-    assert offset == 6
-    assert len(fc.frames) == 1
-
-    detections = fc.frames[0].detectionsUnion.detectionsTruth
-    assert len(detections) == nDetections - 1  # one detection removed!
-
     # test with camId column
     df = truth_detections
-    df['camId'] = offset
-    df['camId'][0] = offset - 1
-    fc, offset = build_truth_frame_container(df, offset, frame_offset=offset)
-    assert offset == 7
+    df['camId'] = [offset] * df.shape[0]
+    df.loc[0, 'camId'] = offset - 1
+    fc, offset = build_frame_container_from_df(df, 'detectionsTruth', offset, frame_offset=offset)
+    assert offset == 6
     assert len(fc.frames) == 1
 
     detections = fc.frames[0].detectionsUnion.detectionsTruth

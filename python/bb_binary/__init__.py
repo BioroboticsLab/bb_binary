@@ -1,15 +1,15 @@
 # -*- coding: utf-8 -*-
-import capnp
 import os
 import errno
-import numpy as np
-import numpy.lib.recfunctions as rf
 import json
 import math
 from datetime import datetime, timedelta
+import numpy as np
+import numpy.lib.recfunctions as rf
 import iso8601
 import pytz
 import six
+import capnp
 
 # TODO: Add warning about windows symlinks
 
@@ -320,7 +320,7 @@ def get_detections(frame):
     elif union_type == 'detectionsTruth':
         detections = frame.detectionsUnion.detectionsTruth
     else:
-        raise KeyError("Type {0} not supported.".format(union_type))
+        raise KeyError("Type {0} not supported.".format(union_type))  # pragma: no cover
     return detections
 
 
@@ -365,19 +365,20 @@ def build_frame_container(from_ts, to_ts, cam_id,
     return fc
 
 
-def build_truth_frame_container(df, cam_id, frame_offset=0):
-    """Builds a frame container containing truth data from dataframe
+def build_frame_container_from_df(df, union_type, cam_id, frame_offset=0):
+    """Builds a frame container from a Pandas DataFrame.
 
     Operates differently from `build_frame_container` because it will be used
     in a different context where we have access to more data.
 
     The minimal set of expected column names in `df` are listed in
-    `minimal_keyset`. Column names are matched to `Frame` and `DetectionTruth`
+    `minimal_keyset`. Column names are matched to `Frame` and `Detection*`
     attributes. Set additional `FrameContainer` attributes like `hiveId` in
     the return value.
 
     Args:
-        df (dataframe): dataframe with truth data
+        df (dataframe): dataframe with detection data
+        union_type (String): the type of detections e.g. detectionsTruth
         cam_id (int): id of camera, also used as `FrameContainer` id
         frame_offset (Optional int): offset for unique frame ids
 
@@ -385,19 +386,28 @@ def build_truth_frame_container(df, cam_id, frame_offset=0):
          FrameContainer: converted data from `df`
          int: number of frames that could be used as `frame_offset`
      """
-    def set_attr_from(object, src, key):
-        """Get attr `key` from `src` and set val to `object` on same `key`"""
+    def set_attr_from(obj, src, key):
+        """Get attr `key` from `src` and set val to `obj` on same `key`"""
         val = getattr(src, key)
         if type(val).__module__ == np.__name__:
             val = np.asscalar(val)
-        setattr(object, key, val)
+        setattr(obj, key, val)
 
     # start with removing untracked data
-    df = df.dropna().copy()
+    #df = df.dropna().copy()
+
+    detection = {
+        'detectionsCVP': DetectionCVP.new_message(),
+        'detectionsDP': DetectionDP.new_message(),
+        'detectionsTruth': DetectionTruth.new_message()
+    }[union_type]
 
     # check that we have all the information we need
-    minimal_keyset = frozenset(['xpos', 'ypos', 'decodedId', 'timestamp'])
-    assert minimal_keyset <= set(df.keys())
+    skip_keys = frozenset(['readability', 'xposHive', 'yposHive', 'frameIdx', 'idx'])
+    minimal_keys = set(detection.to_dict().keys()) - skip_keys
+    available_keys = set(df.keys())
+    assert minimal_keys <= available_keys,\
+        "Missing keys {} in DataFrame.".format(minimal_keys - available_keys)
 
     # convert timestamp to unixtimestamp
     if 'datetime' in df.dtypes.timestamp.name:
@@ -422,17 +432,13 @@ def build_truth_frame_container(df, cam_id, frame_offset=0):
 
     # determine which fields we could assign from dataframe to cap'n proto
     frame = Frame.new_message()
-    frame_fields = [field for field in df.keys()
-                    if hasattr(frame, field)]
+    frame_fields = [field for field in available_keys if hasattr(frame, field)]
 
-    detection = DetectionTruth.new_message()
-    detection_fields = [field for field in df.keys()
-                        if hasattr(detection, field)]
-    has_readability = 'readability' in detection_fields
+    detection_fields = [field for field in available_keys if hasattr(detection, field)]
+    set_readability = union_type == 'detectionsTruth' and 'redability' in available_keys
 
     # create frames (each timestamp maps to a frame)
-    for frameIdx, group in enumerate(df.groupby(by='timestamp')):
-        timestamp, detections = group
+    for frameIdx, (_, detections) in enumerate(df.groupby(by='timestamp')):
         frame = fc.frames[frameIdx]
         frame.id = frame_offset + frameIdx
         frame.frameIdx = frameIdx
@@ -442,13 +448,13 @@ def build_truth_frame_container(df, cam_id, frame_offset=0):
             set_attr_from(frame, detections.iloc[0], key)
 
         # create detections
-        frame.detectionsUnion.init('detectionsTruth', detections.shape[0])
+        frame.detectionsUnion.init(union_type, detections.shape[0])
         for detectionIdx, row in enumerate(detections.itertuples(index=False)):
-            detection = frame.detectionsUnion.detectionsTruth[detectionIdx]
+            detection = getattr(frame.detectionsUnion, union_type)[detectionIdx]
             detection.idx = detectionIdx
             for key in detection_fields:
                 set_attr_from(detection, row, key)
-            if not has_readability:
+            if set_readability:
                 detection.readability = 'unknown'
 
     return fc, new_frame_offset
