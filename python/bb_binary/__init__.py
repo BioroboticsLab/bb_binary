@@ -212,8 +212,9 @@ def convert_frame_to_numpy(frame, keys=None, add_cols=None):
         frame_arr = np.repeat(frame_arr, ret_arr.shape[0], axis=0)
         ret_arr = rf.merge_arrays((frame_arr, ret_arr),
                                   flatten=True, usemask=False)
-
     if ret_arr is not None and add_cols is not None:
+        if keys is None:
+            keys = ret_arr.dtype.names
         for key, val in add_cols.items():
             assert key not in keys, "{} not allowed in add_cols".format(key)
             if hasattr(val, '__len__') and not isinstance(val, str):
@@ -400,6 +401,9 @@ def build_frame_container_from_df(df, union_type, cam_id, frame_offset=0):
     # check that we have all the information we need
     skip_keys = frozenset(['readability', 'xposHive', 'yposHive', 'frameIdx', 'idx'])
     minimal_keys = set(detection.to_dict().keys()) - skip_keys
+    # for some reasons lists are not considered when using to_dict()!
+    if union_type == 'detectionsDP':
+        minimal_keys = minimal_keys | set(['decodedId', 'descriptor'])
     available_keys = set(df.keys())
     assert minimal_keys <= available_keys,\
         "Missing keys {} in DataFrame.".format(minimal_keys - available_keys)
@@ -412,7 +416,7 @@ def build_frame_container_from_df(df, union_type, cam_id, frame_offset=0):
                 t.microsecond, tzinfo=pytz.utc)))
 
     # select only entries for cam
-    if 'camId' in df.keys():
+    if 'camId' in available_keys:
         df = df[df.camId == cam_id]
 
     # create frame container

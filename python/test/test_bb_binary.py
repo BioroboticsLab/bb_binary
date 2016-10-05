@@ -115,11 +115,29 @@ def frame_truth_data(frame_data):
     return frame
 
 
+@pytest.fixture(params=['cvp', 'dp', 'truth'])
+def frame_data_all(request, frame_cvp_data, frame_dp_data, frame_truth_data):
+    """Fixture to test different union types in Frames."""
+    return {'cvp': frame_cvp_data, 'dp': frame_dp_data, 'truth': frame_truth_data}[request.param]
+
+
+def test_bbb_frame_container_errors(frame_data_all):
+    """Test minimal keys when building `FrameContainer`"""
+    frame = frame_data_all
+    expected_keys = ('timestamp', 'xpos', 'ypos', 'detectionsUnion')
+
+    arr = convert_frame_to_numpy(frame, expected_keys)
+    bbb_check_frame_data(frame, arr, expected_keys)
+    detections = pd.DataFrame(arr)
+    with pytest.raises(AssertionError) as error_information:
+        fc, offset = build_frame_container_from_df(detections, frame.detectionsUnion.which(), 0)
+    assert 'decodedId' in str(error_information.value)
+
+
 def test_bbb_frame_container_from_truth_data(frame_truth_data):
     """Truth data is correctly converted to `FrameContainer`."""
     frame = frame_truth_data
-    expected_keys = ('timestamp', 'xpos', 'ypos', 'decodedId',
-                     'readability', 'detectionsUnion')
+    expected_keys = ('timestamp', 'xpos', 'ypos', 'decodedId', 'readability', 'detectionsUnion')
 
     arr = convert_frame_to_numpy(frame, expected_keys)
     bbb_check_frame_data(frame, arr, expected_keys)
@@ -212,8 +230,8 @@ def test_bbb_frame_container_from_truth_data(frame_truth_data):
 def test_bbb_convert_detections_to_numpy(frame_dp_data):
     """Detections are correctly converted to np array and frame is ignored."""
     frame = frame_dp_data
-    expected_keys = ('idx', 'xpos', 'ypos', 'xRotation', 'yRotation',
-                     'zRotation', 'radius', 'decodedId')
+    expected_keys = ('idx', 'xpos', 'ypos', 'xRotation', 'yRotation', 'zRotation',
+                     'radius', 'decodedId')
 
     detections = frame.detectionsUnion.detectionsDP
     arr = _convert_detections_to_numpy(detections, expected_keys)
@@ -281,8 +299,7 @@ def test_bbb_convert_frame_with_additional_cols_to_numpy(frame_dp_data):
     """Frame with additional columns is correctly converted to np array."""
     frame = frame_dp_data
 
-    expected_keys = ('frameId', 'timedelta', 'timestamp',
-                     'decodedId', 'detectionsUnion')
+    expected_keys = ('frameId', 'timedelta', 'timestamp', 'decodedId', 'detectionsUnion')
 
     # one col, single value for whole columns
     arr = convert_frame_to_numpy(frame, expected_keys, add_cols={'camId': 2})
