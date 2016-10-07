@@ -1,18 +1,17 @@
 # -*- coding: utf-8 -*-
+import os
+import math
+from datetime import datetime
+import numpy as np
+import pandas as pd
+from pandas.util.testing import assert_frame_equal
+import pytz
+import pytest
 from conftest import fill_repository
-from bb_binary import build_frame_container, parse_video_fname, parse_image_fname, \
+from bb_binary import build_frame_container, parse_fname, parse_video_fname, parse_image_fname, \
     Frame, Repository, dt_to_str, convert_frame_to_numpy, \
     _convert_detections_to_numpy, _convert_frame_to_numpy, get_detections, \
     build_frame_container_from_df, to_datetime, int_id_to_binary
-
-from datetime import datetime
-import pytz
-import numpy as np
-import os
-import pandas as pd
-from pandas.util.testing import assert_frame_equal
-import pytest
-import math
 
 
 def test_bbb_is_loaded():
@@ -26,11 +25,38 @@ def test_bbb_relative_path():
 
 
 def test_dt_to_str():
+    """Test conversion of datetime objects to string representation."""
     dt = datetime(2015, 8, 15, 12, 0, 40, 333967, tzinfo=pytz.utc)
     assert dt_to_str(dt) == "2015-08-15T12:00:40.333967Z"
 
+    with pytest.raises(Exception, message="Got a datetime object not in UTC. Allways use UTC."):
+        dt_to_str(dt.replace(tzinfo=None))
+
+
+def test_to_datetime():
+    """Test conversion of timestamps to datetime."""
+    expected_dt = datetime(2015, 8, 15, 12, 0, 40, tzinfo=pytz.utc)
+
+    # test with int
+    dt = to_datetime((expected_dt - datetime(1970, 1, 1, tzinfo=pytz.utc)).total_seconds())
+    assert dt == expected_dt
+
+    # test with float
+    expected_dt_float = expected_dt.replace(microsecond=333967)
+    dt = to_datetime((expected_dt_float - datetime(1970, 1, 1, tzinfo=pytz.utc)).total_seconds())
+    assert dt == expected_dt_float
+
+    # test with datetime object
+    dt = to_datetime(expected_dt)
+    assert dt == expected_dt
+
+    # test with string
+    with pytest.raises(TypeError):
+        dt = to_datetime("2015-08-15T12:00:40.333967Z")
+
 
 def test_int_id_to_binary():
+    """Test conversion of integer id representation to binary array representation."""
     bit_arr = int_id_to_binary(8)
     assert np.all(bit_arr == np.array([0, 0, 0, 0, 0, 0,
                                        0, 0, 1, 0, 0, 0], dtype=np.uint8))
@@ -39,8 +65,10 @@ def test_int_id_to_binary():
     assert np.all(bit_arr == np.array([1, 1, 1, 1, 1, 1,
                                        1, 1, 1, 1, 1, 1], dtype=np.uint8))
 
-    with pytest.raises(Exception):  # to big value
+    with pytest.raises(Exception) as exception_information:  # to big value
         bit_arr = int_id_to_binary(8096)
+
+    assert 'overflows' in str(exception_information.value)
 
 
 @pytest.fixture
@@ -59,8 +87,8 @@ def frame_data():
 def frame_dp_data(frame_data):
     """Frame with detections in new pipeline format."""
     frame = frame_data.copy()
-    frame.detectionsUnion.init('detectionsDP', 3)
-    for i in range(0, 3):
+    frame.detectionsUnion.init('detectionsDP', 4)
+    for i in range(0, 4):
         detection = frame.detectionsUnion.detectionsDP[i]
         detection.idx = i
         detection.xpos = 344 + 10 * i
@@ -69,12 +97,15 @@ def frame_dp_data(frame_data):
         detection.yRotation = 0.1 + 0.1 * i
         detection.xRotation = -0.14 - 0.1 * i
         detection.radius = 22 + i
+        detection.localizerSaliency = 0.8765
         nb_bits = 12
         bits = detection.init('decodedId', nb_bits)
         bit_value = nb_bits * (1+i)
         for i in range(nb_bits):
             bits[i] = bit_value
-
+        descriptor = detection.init('descriptor', nb_bits)
+        for i in range(nb_bits):
+            descriptor[i] = bit_value
     return frame
 
 
@@ -82,8 +113,8 @@ def frame_dp_data(frame_data):
 def frame_cvp_data(frame_data):
     """Frame with detections in old pipeline format."""
     frame = frame_data.copy()
-    frame.detectionsUnion.init('detectionsCVP', 3)
-    for i in range(0, 3):
+    frame.detectionsUnion.init('detectionsCVP', 4)
+    for i in range(0, 4):
         detection = frame.detectionsUnion.detectionsCVP[i]
         detection.idx = 0
         detection.candidateIdx = 0
@@ -121,12 +152,28 @@ def frame_data_all(request, frame_cvp_data, frame_dp_data, frame_truth_data):
     return {'cvp': frame_cvp_data, 'dp': frame_dp_data, 'truth': frame_truth_data}[request.param]
 
 
+def get_detection_keys(union_type):
+    """Function holding union type specific detection keys."""
+    keys = ['idx', 'xpos', 'ypos', 'xposHive', 'yposHive', 'decodedId', 'detectionsUnion']
+
+    additional_keys = {
+        'detectionsDP': ['xRotation', 'yRotation', 'zRotation',
+                         'radius', 'localizerSaliency', 'descriptor'],
+        'detectionsCVP': ['xRotation', 'yRotation', 'zRotation',
+                          'gridIdx', 'candidateIdx', 'eScore', 'gScore', 'lScore'],
+        'detectionsTruth': ['readability']
+    }[union_type]
+
+    keys.extend(additional_keys)
+    return keys
+
+
 def test_bbb_frame_container_errors(frame_data_all):
     """Test minimal keys when building `FrameContainer`"""
     frame = frame_data_all
     expected_keys = ('timestamp', 'xpos', 'ypos', 'detectionsUnion')
 
-    arr = convert_frame_to_numpy(frame, expected_keys)
+    arr = convert_frame_to_numpy(frame, keys=expected_keys)
     bbb_check_frame_data(frame, arr, expected_keys)
     detections = pd.DataFrame(arr)
     with pytest.raises(AssertionError) as error_information:
@@ -137,7 +184,8 @@ def test_bbb_frame_container_errors(frame_data_all):
 def test_bbb_frame_container_from_truth_data(frame_truth_data):
     """Truth data is correctly converted to `FrameContainer`."""
     frame = frame_truth_data
-    expected_keys = ('timestamp', 'xpos', 'ypos', 'decodedId', 'readability', 'detectionsUnion')
+    expected_keys = ['timestamp', ]
+    expected_keys.extend(get_detection_keys(frame.detectionsUnion.which()))
 
     arr = convert_frame_to_numpy(frame, expected_keys)
     bbb_check_frame_data(frame, arr, expected_keys)
@@ -227,110 +275,90 @@ def test_bbb_frame_container_from_truth_data(frame_truth_data):
     assert len(detections) == nDetections - 1  # one detection removed!
 
 
-def test_bbb_convert_detections_to_numpy(frame_dp_data):
+def test_bbb_convert_detections_to_numpy(frame_data_all):
     """Detections are correctly converted to np array and frame is ignored."""
-    frame = frame_dp_data
-    expected_keys = ('idx', 'xpos', 'ypos', 'xRotation', 'yRotation', 'zRotation',
-                     'radius', 'decodedId')
+    frame = frame_data_all
+    expected_keys = get_detection_keys(frame.detectionsUnion.which())
 
-    detections = frame.detectionsUnion.detectionsDP
-    arr = _convert_detections_to_numpy(detections, expected_keys)
+    detections = get_detections(frame)
+    arr = _convert_detections_to_numpy(detections, keys=expected_keys)
     bbb_check_frame_data(frame, arr, expected_keys)
 
+    # now compare behaviour of helper and parent function
+    arr_frame = convert_frame_to_numpy(frame, keys=expected_keys)
+    assert np.all(arr == arr_frame)
 
-def test_bbb_convert_frame_to_numpy(frame_data):
+
+def test_bbb_convert_only_frame_to_numpy(frame_data_all):
     """Frame is correctly converted to np array and detections are ignored."""
-    frame = frame_data
+    frame = frame_data_all
 
-    expected_keys = ('frameId', 'timedelta', 'timestamp')
+    expected_keys = ('frameId', 'timedelta', 'timestamp', 'detectionsUnion')
 
-    arr = _convert_frame_to_numpy(frame, expected_keys)
+    arr = _convert_frame_to_numpy(frame, keys=expected_keys)
+    bbb_check_frame_data(frame, arr, expected_keys)
+
+    # now compare behaviour of helper and parent function
+    arr_frame = convert_frame_to_numpy(frame, keys=expected_keys)
+    assert np.all(arr == arr_frame)
+
+
+def test_bbb_convert_frame_and_detections_to_numpy(frame_data_all):
+    """Frame and detections are correctly converted to np array."""
+    frame = frame_data_all
+
+    expected_keys = ['frameId', 'timedelta', 'timestamp']
+    expected_keys.extend(get_detection_keys(frame.detectionsUnion.which()))
+
+    arr = convert_frame_to_numpy(frame, keys=expected_keys)
     bbb_check_frame_data(frame, arr, expected_keys)
 
 
-def test_bbb_convert_only_frame_to_numpy(frame_dp_data):
-    """Frame is correctly converted to np array and detections are ignored."""
-    frame = frame_dp_data
-
-    expected_keys = ('frameId', 'timedelta', 'timestamp')
-
-    arr = _convert_frame_to_numpy(frame, expected_keys)
-    bbb_check_frame_data(frame, arr, expected_keys)
-
-
-def test_bbb_convert_frame_and_detections_dp_to_numpy(frame_dp_data):
-    """Frame and detections (dp) are correctly converted to np array."""
-    frame = frame_dp_data
-
-    expected_keys = ('frameId', 'timedelta', 'timestamp',
-                     'idx', 'xpos', 'ypos', 'xRotation', 'yRotation',
-                     'zRotation', 'radius', 'decodedId', 'detectionsUnion')
-
-    arr = convert_frame_to_numpy(frame, expected_keys)
-    bbb_check_frame_data(frame, arr, expected_keys)
-
-
-def test_bbb_convert_frame_and_detections_cvp_to_numpy(frame_cvp_data):
-    """Frame and detections (cvp) are correctly converted to np array."""
-    frame = frame_cvp_data
-
-    expected_keys = ('frameId', 'timedelta', 'timestamp',
-                     'idx', 'xpos', 'ypos', 'xRotation', 'yRotation',
-                     'zRotation', 'candidateIdx', 'gridIdx', 'decodedId',
-                     'detectionsUnion')
-
-    arr = convert_frame_to_numpy(frame, expected_keys)
-    bbb_check_frame_data(frame, arr, expected_keys)
-
-
-def test_bbb_convert_frame_and_detections_truth_to_numpy(frame_truth_data):
-    """Frame and detections (cvp) are correctly converted to np array."""
-    frame = frame_truth_data
-
-    expected_keys = ('frameId', 'timedelta', 'timestamp',
-                     'idx', 'xpos', 'ypos', 'decodedId', 'readability',
-                     'detectionsUnion')
-
-    arr = convert_frame_to_numpy(frame, expected_keys)
-    bbb_check_frame_data(frame, arr, expected_keys)
-
-
-def test_bbb_convert_frame_with_additional_cols_to_numpy(frame_dp_data):
+def test_bbb_convert_frame_with_additional_cols_to_numpy(frame_data_all):
     """Frame with additional columns is correctly converted to np array."""
-    frame = frame_dp_data
+    frame = frame_data_all
 
     expected_keys = ('frameId', 'timedelta', 'timestamp', 'decodedId', 'detectionsUnion')
 
     # one col, single value for whole columns
-    arr = convert_frame_to_numpy(frame, expected_keys, add_cols={'camId': 2})
+    arr = convert_frame_to_numpy(frame, keys=expected_keys, add_cols={'camId': 2})
     assert 'camId' in arr.dtype.names
     assert np.all(arr['camId'] == 2)
 
     # two cols, single value
-    arr = convert_frame_to_numpy(frame, expected_keys,
-                                 add_cols={'camId': 2, 'second': 3})
+    arr = convert_frame_to_numpy(frame, keys=expected_keys, add_cols={'camId': 2, 'second': 3})
     assert 'camId' in arr.dtype.names
     assert 'second' in arr.dtype.names
     assert np.all(arr['camId'] == 2)
     assert np.all(arr['second'] == 3)
 
     # list for whole column
-    arr = convert_frame_to_numpy(frame, expected_keys,
-                                 add_cols={'camId': range(0, 3)})
+    arr = convert_frame_to_numpy(frame, keys=expected_keys, add_cols={'camId': range(0, 4)})
     assert 'camId' in arr.dtype.names
-    assert np.all(arr['camId'] == np.array(range(0, 3)))
+    assert np.all(arr['camId'] == np.array(range(0, 4)))
 
     # existing column
     with pytest.raises(AssertionError):
-        arr = convert_frame_to_numpy(frame, expected_keys,
-                                     add_cols={'frameId': 9})
+        arr = convert_frame_to_numpy(frame, keys=expected_keys, add_cols={'frameId': 9})
+
+
+def test_bbb_convert_frame_default_keys_to_numpy(frame_data_all):
+    """Convert frame to np arrays without explicitly requesting certain keys."""
+    frame = frame_data_all
+
+    frame_keys = set(['frameId', 'dataSourceIdx', 'frameIdx', 'timestamp', 'timedelta'])
+    detection_keys = set(get_detection_keys(frame.detectionsUnion.which()))
+    expected_keys = frame_keys | detection_keys | set(['camId'])
+
+    # extract frame without explicitly asking for keys
+    arr = convert_frame_to_numpy(frame, add_cols={'camId': 0})
+    bbb_check_frame_data(frame, arr, expected_keys)
 
 
 def bbb_check_frame_data(frame, arr, expected_keys):
     """Helper to compare frame data to numpy array."""
     # check if we have all the expected keys in the array (and only these)
-    expected_keys = set(expected_keys)
-    expected_keys.discard('detectionsUnion')
+    expected_keys = set(expected_keys) - set(['detectionsUnion'])
     assert expected_keys == set(arr.dtype.names)
     assert len(expected_keys) == len(arr.dtype.names)
 
@@ -339,12 +367,15 @@ def bbb_check_frame_data(frame, arr, expected_keys):
     for i, detection in enumerate(detections):
         # check if the values are as expected
         for key in expected_keys:
-            if key == 'decodedId' and \
-               frame.detectionsUnion.which() == 'detectionsDP':
+            if key == 'camId':
+                continue
+            elif key == 'decodedId' and frame.detectionsUnion.which() == 'detectionsDP':
                 assert np.allclose(arr[key][i],
                                    np.array([detection.decodedId[0] / 255.] *
                                             len(detection.decodedId)),
                                    atol=0.5/255.)
+            elif key == 'descriptor':
+                assert np.all(arr[key][i] == getattr(detection, key))
             elif key == 'frameId':
                 assert np.all(arr[key] == getattr(frame, 'id'))
             elif hasattr(frame, key):
@@ -357,7 +388,7 @@ def bbb_check_frame_data(frame, arr, expected_keys):
                 assert arr[key][i] == getattr(detection, key)
 
 
-def test_bbb_get_detections(frame_data, frame_dp_data, frame_cvp_data):
+def test_bbb_get_detections(frame_data, frame_dp_data, frame_cvp_data, frame_truth_data):
     """Extracts correct detections from old and new pipeline data."""
     diffKey = 'candidateIdx'
     detections = get_detections(frame_dp_data)
@@ -365,6 +396,9 @@ def test_bbb_get_detections(frame_data, frame_dp_data, frame_cvp_data):
 
     detections = get_detections(frame_cvp_data)
     assert hasattr(detections[0], diffKey)
+
+    detections = get_detections(frame_truth_data)
+    assert hasattr(detections[0], 'readability')
 
     # Important note: the default value for detectionsUnion is detectionsCVP
     assert frame_data.detectionsUnion.which() == 'detectionsCVP'
@@ -638,45 +672,96 @@ def test_bbb_repo_open_frame_container(tmpdir):
     assert fc.toTimestamp == open_fc.toTimestamp
 
 
-def test_parse_image_fname():
-    camIdx, ts = parse_image_fname('Cam_0_20140805151756_200.jpeg')
-    assert ts.hour == 13  # two ours differenct due to utc / etc
-    assert ts.year == 2014
-    assert ts.minute == 17
-    assert ts.second == 56
-    assert ts.microsecond == 200
+@pytest.fixture(params=['iso', 'beesbook', 'auto_iso', 'auto_bb', 'arbitrary'])
+def image(request):
+    """Fixture to test extraction of information on different image filenames."""
+    name_beesbook = 'Cam_0_20140805151756_200.jpeg'
+    name_iso = 'Cam_0_2014-08-05T13:17:56,000200Z.jpeg'
+    expected_dt = datetime(2014, 8, 5, 13, 17, 56, 200, tzinfo=pytz.utc)
+    expected_cam = 0
+    data = {'dt': expected_dt, 'cam': expected_cam, 'format': 'beesbook', 'name': name_beesbook}
+    if 'iso' in request.param:
+        data['format'] = 'iso'
+        data['name'] = name_iso
+    elif 'beesbook' not in request.param:
+        data['format'] = 'arbitrary'
+
+    if 'auto' in request.param:
+        data['format'] = 'auto'
+    return data
 
 
-def test_parse_video_fname():
-    # sometimes images have two underscores
-    fname = "Cam_1_20160501160208__5_TO_Cam_1_20160501160748__1.avi"
-    camIdx, begin, end = parse_video_fname(fname, format='beesbook')
-    assert camIdx == 1
-    assert begin.year == 2016
+def test_parse_fname_images(image):
+    """Tests the extraction of camera, date and time information from filenames."""
+    camIdx, begin, end = parse_fname(image['name'])
+    assert camIdx == image['cam']
+    assert begin == image['dt']
+    assert begin == end
 
-    fname = "Cam_1_20160501160208_958365_TO_Cam_1_20160501160748_811495.avi"
-    camIdx, begin, end = parse_video_fname(fname, format='beesbook')
-    assert camIdx == 1
-    assert begin.year == 2016
 
-    fname = "Cam_1_20160501160208_0_TO_Cam_1_20160501160748_0.bbb"
-    camIdx, begin, end = parse_video_fname(fname, format='beesbook')
-    assert camIdx == 1
-    assert begin.year == 2016
-    assert begin.month == 5
+def test_parse_image_fname(image):
+    """Tests the extraction of camera, date and time information from image filenames."""
+    if image['format'] == 'arbitrary':
+        with pytest.raises(Exception):
+            camIdx, ts = parse_image_fname(image['name'], format=image['format'])
+        return
 
-    fname = "Cam_0_19700101T001000.000000Z--19700101T002000.000000Z.bbb"
-    camIdx, begin, end = parse_video_fname(fname, format='iso')
-    assert begin == datetime.fromtimestamp(10*60, tz=pytz.utc)
-    assert end == datetime.fromtimestamp(20*60, tz=pytz.utc)
+    camIdx, ts = parse_image_fname(image['name'], format=image['format'])
+    assert camIdx == image['cam']
+    assert ts == image['dt']
 
-    fname = "Cam_0_1970-01-01T00:10:00.000000Z--1970-01-01T00:20:00.000000Z.bbb"
-    camIdx, begin, end = parse_video_fname(fname, format='auto')
-    assert begin == datetime.fromtimestamp(10*60, tz=pytz.utc)
-    assert end == datetime.fromtimestamp(20*60, tz=pytz.utc)
 
-    fname = "Cam_1_20160501160208_0_TO_Cam_1_20160501160748_0.bbb"
-    camIdx, begin, end = parse_video_fname(fname, format='auto')
-    assert camIdx == 1
-    assert begin.year == 2016
-    assert begin.month == 5
+@pytest.fixture(params=['arbitrary', 'beesbook', 'beesbook_one_underscore',
+                        'beesbook_two_underscores', 'auto_beesbook',
+                        'iso', 'iso_hyphen', 'auto_iso'])
+def video(request):
+    """Fixture to test extraction of information on different video filenames."""
+    name = "Cam_1_20160501160208_0_TO_Cam_1_20160501160748_0.bbb"
+    dt_begin = datetime(2016, 5, 1, 14, 2, 8, tzinfo=pytz.utc)
+    dt_end = datetime(2016, 5, 1, 14, 7, 48, tzinfo=pytz.utc)
+    cam = 1
+    vformat = 'beesbook'
+    if 'beesbook_one_underscore' in request.param:
+        name = "Cam_1_20160501160208_958365_TO_Cam_1_20160501160748_811495.avi"
+        dt_begin = dt_begin.replace(microsecond=958365)
+        dt_end = dt_end.replace(microsecond=811495)
+    elif 'beesbook_two_underscores' in request.param:
+        name = "Cam_1_20160501160208__5_TO_Cam_1_20160501160748__1.avi"
+        dt_begin = dt_begin.replace(microsecond=5)
+        dt_end = dt_end.replace(microsecond=1)
+    elif 'iso' in request.param:
+        if 'hyphen' in request.param:
+            name = "Cam_0_1970-01-01T00:10:00.000000Z--1970-01-01T00:20:00.000000Z.bbb"
+        else:
+            name = "Cam_0_19700101T001000.000000Z--19700101T002000.000000Z.bbb"
+        dt_begin = datetime.fromtimestamp(10*60, tz=pytz.utc)
+        dt_end = datetime.fromtimestamp(20*60, tz=pytz.utc)
+        cam = 0
+        vformat = 'iso'
+    elif 'arbitrary' in request.param:
+        vformat = 'arbitrary'
+
+    if 'auto' in request.param:
+        vformat = 'auto'
+    return {'dt_begin': dt_begin, 'dt_end': dt_end, 'cam': cam, 'format': vformat, 'name': name}
+
+
+def test_parse_fname_videos(video):
+    """Tests the extraction of camera, date and time information from filenames."""
+    camIdx, begin, end = parse_video_fname(video['name'])
+    assert camIdx == video['cam']
+    assert begin == video['dt_begin']
+    assert end == video['dt_end']
+
+
+def test_parse_video_fname(video):
+    """Tests the extraction of camera and date information from video filenames."""
+    if video['format'] == 'arbitrary':
+        with pytest.raises(Exception):
+            camIdx, begin, end = parse_video_fname(video['name'], format=video['format'])
+        return
+
+    camIdx, begin, end = parse_video_fname(video['name'], format=video['format'])
+    assert camIdx == video['cam']
+    assert begin == video['dt_begin']
+    assert end == video['dt_end']

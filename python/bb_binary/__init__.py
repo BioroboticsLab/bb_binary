@@ -153,7 +153,7 @@ def to_datetime(t):
     elif type(t) == datetime:
         return t
     else:
-        TypeError("Cannot convert {} to datetime".format(t))
+        raise TypeError("Cannot convert {} to datetime".format(t))
 
 
 def dt_to_str(dt):
@@ -163,7 +163,7 @@ def dt_to_str(dt):
     dt_str = dt.strftime(isoformat)
     if dt.microsecond != 0:
         dt_str += ".{:06d}".format(dt.microsecond)
-    if dt.utcoffset().total_seconds() == 0:
+    if dt.tzinfo is not None and dt.utcoffset().total_seconds() == 0:
         return dt_str + "Z"
     else:
         raise Exception("Got a datetime object not in UTC. Allways use UTC.")
@@ -197,7 +197,7 @@ def convert_frame_to_numpy(frame, keys=None, add_cols=None):
 
     Args:
         frame (Frame): datastructure with frame data from capnp.
-        keys (Optional tuple): only these keys are converted to the np array.
+        keys (Optional iterable): only these keys are converted to the np array.
         add_cols (Optional dictionary): additional columns for the np array,
             use either a single value or a sequence of correct length.
     """
@@ -212,6 +212,9 @@ def convert_frame_to_numpy(frame, keys=None, add_cols=None):
         frame_arr = np.repeat(frame_arr, ret_arr.shape[0], axis=0)
         ret_arr = rf.merge_arrays((frame_arr, ret_arr),
                                   flatten=True, usemask=False)
+    elif frame_arr is not None:
+        ret_arr = frame_arr
+
     if ret_arr is not None and add_cols is not None:
         if keys is None:
             keys = ret_arr.dtype.names
@@ -276,7 +279,7 @@ def _convert_detections_to_numpy(detections, keys=None):
     else:
         keys = list(set(keys) & detection_keys)
 
-    # abort if no frame information should be extracted
+    # abort if no information should be extracted
     if len(keys) == 0:
         return None
 
@@ -312,7 +315,7 @@ def _convert_detections_to_numpy(detections, keys=None):
 
 
 def get_detections(frame):
-    """Extracts detections of CP or CVP from frame."""
+    """Extracts detections of CP, CVP or truth data from frame."""
     union_type = frame.detectionsUnion.which()
     if union_type == 'detectionsDP':
         detections = frame.detectionsUnion.detectionsDP
@@ -434,7 +437,6 @@ def build_frame_container_from_df(df, union_type, cam_id, frame_offset=0):
     frame_fields = [field for field in available_keys if hasattr(frame, field)]
 
     detection_fields = [field for field in available_keys if hasattr(detection, field)]
-    set_readability = union_type == 'detectionsTruth' and 'redability' in available_keys
 
     # create frames (each timestamp maps to a frame)
     for frameIdx, (_, detections) in enumerate(df.groupby(by='timestamp')):
@@ -453,8 +455,6 @@ def build_frame_container_from_df(df, union_type, cam_id, frame_offset=0):
             detection.idx = detectionIdx
             for key in detection_fields:
                 set_attr_from(detection, row, key)
-            if set_readability:
-                detection.readability = 'unknown'
 
     return fc, new_frame_offset
 
