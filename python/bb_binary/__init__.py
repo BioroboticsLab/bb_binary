@@ -414,7 +414,7 @@ def build_frame_container_from_df(df, union_type, cam_id, frame_offset=0):
     list_keys = set()
     # for some reasons lists are not considered when using to_dict()!
     if union_type == 'detectionsDP':
-        minimal_keys = minimal_keys | set(['decodedId', 'descriptor'])
+        minimal_keys = minimal_keys | set(['decodedId'])
         list_keys = list_keys | set(['decodedId', 'descriptor'])
     available_keys = set(df.keys())
     assert minimal_keys <= available_keys,\
@@ -431,8 +431,9 @@ def build_frame_container_from_df(df, union_type, cam_id, frame_offset=0):
                 t.year, t.month, t.day, t.hour, t.minute, t.second,
                 t.microsecond, tzinfo=pytz.utc)))
 
-    # convert decodedId from float to integers
-    if 'decodedId' in available_keys and union_type == 'detectionsDP':
+    # convert decodedId from float to integers (if necessary)
+    if 'decodedId' in available_keys and union_type == 'detectionsDP' and\
+       np.all(np.array(df.loc[df.index[0], 'decodedId']) < 1.1):
         df.loc[:, 'decodedId'] = df.loc[:, 'decodedId'].apply(
             lambda l: [int(round(fid * 255.)) for fid in l])
 
