@@ -422,18 +422,19 @@ def build_frame_container_from_df(df, union_type, cam_id, frame_offset=0):
 
     # select only entries for cam
     if 'camId' in available_keys:
-        df = df[df.camId == cam_id]
+        df = df[df.camId == cam_id].copy()
 
     # convert timestamp to unixtimestamp
     if 'datetime' in df.dtypes.timestamp.name:
-        df.timestamp = df.timestamp.apply(
+        df.loc[:, 'timestamp'] = df.loc[:, 'timestamp'].apply(
             lambda t: to_timestamp(datetime(
                 t.year, t.month, t.day, t.hour, t.minute, t.second,
                 t.microsecond, tzinfo=pytz.utc)))
 
     # convert decodedId from float to integers
     if 'decodedId' in available_keys and union_type == 'detectionsDP':
-        df.decodedId = df.decodedId.apply(lambda l: [int(round(fid * 255.)) for fid in l])
+        df.loc[:, 'decodedId'] = df.loc[:, 'decodedId'].apply(
+            lambda l: [int(round(fid * 255.)) for fid in l])
 
     # create frame container
     tstamps = df.timestamp.unique()

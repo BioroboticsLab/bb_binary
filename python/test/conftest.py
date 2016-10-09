@@ -1,3 +1,9 @@
+"""Setup for tests and fixtures."""
+import warnings
+import pandas as pd
+
+# enable stack trace for annoying SettingWithCopyWarning
+warnings.simplefilter("error", pd.core.common.SettingWithCopyWarning)
 
 
 def fill_repository(repo, begin_end_cam_id):
