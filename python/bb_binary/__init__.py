@@ -220,7 +220,7 @@ def convert_frame_to_numpy(frame, keys=None, add_cols=None):
             keys = ret_arr.dtype.names
         for key, val in add_cols.items():
             assert key not in keys, "{} not allowed in add_cols".format(key)
-            if hasattr(val, '__len__') and not isinstance(val, str):
+            if hasattr(val, '__len__') and not isinstance(val, six.string_types):
                 msg = "{} has not length {}".format(key, ret_arr.shape[0])
                 assert len(val) == ret_arr.shape[0], msg
             else:
@@ -291,7 +291,7 @@ def _convert_detections_to_numpy(detections, keys=None):
     descriptor_key = 'descriptor'
     descriptor_index = None
     if decoded_id_key in keys and isinstance(detection0[decoded_id_key], list):
-        # special handling of decodedId as float array in CP pipeline data
+        # special handling of decodedId as float array in DP pipeline data
         decoded_id_index = keys.index(decoded_id_key)
         formats[decoded_id_index] = str(len(detection0[decoded_id_key])) + 'f8'
     elif readability_key in keys:
@@ -299,7 +299,7 @@ def _convert_detections_to_numpy(detections, keys=None):
         readbility_index = keys.index(readability_key)
         formats[readbility_index] = 'S10'
     if descriptor_key in keys and isinstance(detection0[descriptor_key], list):
-        # special handling of descriptor as uint8 array in CP pipeline data
+        # special handling of descriptor as uint8 array in DP pipeline data
         descriptor_index = keys.index(descriptor_key)
         formats[descriptor_index] = str(len(detection0[descriptor_key])) + 'u8'
     detection_arr = np.empty(nrows, dtype={'names': keys, 'formats': formats})
@@ -315,7 +315,7 @@ def _convert_detections_to_numpy(detections, keys=None):
 
 
 def get_detections(frame):
-    """Extracts detections of CP, CVP or truth data from frame."""
+    """Extracts detections of DP, CVP or truth data from frame."""
     union_type = frame.detectionsUnion.which()
     if union_type == 'detectionsDP':
         detections = frame.detectionsUnion.detectionsDP
@@ -347,11 +347,6 @@ def build_frame_container(from_ts, to_ts, cam_id,
         video_last_frame_idx (Optional str): Index of the last frame used
             from the video.
     """
-    fc = FrameContainer.new_message()
-    fc.fromTimestamp = from_ts
-    fc.toTimestamp = to_ts
-    data_sources = fc.init('dataSources', 1)
-
     fc = FrameContainer.new_message()
     fc.fromTimestamp = from_ts
     fc.toTimestamp = to_ts
@@ -391,9 +386,21 @@ def build_frame_container_from_df(df, union_type, cam_id, frame_offset=0):
     def set_attr_from(obj, src, key):
         """Get attr `key` from `src` and set val to `obj` on same `key`"""
         val = getattr(src, key)
+        # special handling for list type fields
+        if key in list_keys:
+            set_list_attr(obj, val, key)
+            return
         if type(val).__module__ == np.__name__:
             val = np.asscalar(val)
         setattr(obj, key, val)
+
+    def set_list_attr(obj, list_src, key):
+        """Initialize list `key` on `object` and set all values from `list_src`."""
+        new_list = obj.init(key, len(list_src))
+        for i, val in enumerate(list_src):
+            if type(val).__module__ == np.__name__:
+                val = np.asscalar(val)
+            new_list[i] = val
 
     detection = {
         'detectionsCVP': DetectionCVP.new_message(),
@@ -404,12 +411,18 @@ def build_frame_container_from_df(df, union_type, cam_id, frame_offset=0):
     # check that we have all the information we need
     skip_keys = frozenset(['readability', 'xposHive', 'yposHive', 'frameIdx', 'idx'])
     minimal_keys = set(detection.to_dict().keys()) - skip_keys
+    list_keys = set()
     # for some reasons lists are not considered when using to_dict()!
     if union_type == 'detectionsDP':
         minimal_keys = minimal_keys | set(['decodedId', 'descriptor'])
+        list_keys = list_keys | set(['decodedId', 'descriptor'])
     available_keys = set(df.keys())
     assert minimal_keys <= available_keys,\
         "Missing keys {} in DataFrame.".format(minimal_keys - available_keys)
+
+    # select only entries for cam
+    if 'camId' in available_keys:
+        df = df[df.camId == cam_id]
 
     # convert timestamp to unixtimestamp
     if 'datetime' in df.dtypes.timestamp.name:
@@ -418,9 +431,9 @@ def build_frame_container_from_df(df, union_type, cam_id, frame_offset=0):
                 t.year, t.month, t.day, t.hour, t.minute, t.second,
                 t.microsecond, tzinfo=pytz.utc)))
 
-    # select only entries for cam
-    if 'camId' in available_keys:
-        df = df[df.camId == cam_id]
+    # convert decodedId from float to integers
+    if 'decodedId' in available_keys and union_type == 'detectionsDP':
+        df.decodedId = df.decodedId.apply(lambda l: [int(round(fid * 255.)) for fid in l])
 
     # create frame container
     tstamps = df.timestamp.unique()

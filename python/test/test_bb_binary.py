@@ -168,6 +168,26 @@ def get_detection_keys(union_type):
     return keys
 
 
+def convert_readability(df):
+    """Helper to convert readability column from binary to string."""
+    df.readability = df.readability.apply(lambda x: x.decode('UTF-8'))
+    return df
+
+
+def make_df_from_np(np_arr, union_type):
+    """Helper to convert a numpy array with detection data to a pandas dataframe."""
+    if union_type == 'detectionsDP':
+        detections = pd.DataFrame(np_arr[list(set(np_arr.dtype.fields.keys()) -
+                                              set(['decodedId', 'descriptor']))])
+        detections['decodedId'] = pd.Series([list(idList) for idList in np_arr['decodedId']])
+        detections['descriptor'] = pd.Series([list(descList) for descList in np_arr['descriptor']])
+    else:
+        detections = pd.DataFrame(np_arr)
+    if union_type == 'detectionsTruth':
+        detections = convert_readability(detections)
+    return detections
+
+
 def test_bbb_frame_container_errors(frame_data_all):
     """Test minimal keys when building `FrameContainer`"""
     frame = frame_data_all
@@ -181,47 +201,45 @@ def test_bbb_frame_container_errors(frame_data_all):
     assert 'decodedId' in str(error_information.value)
 
 
-def test_bbb_frame_container_from_truth_data(frame_truth_data):
-    """Truth data is correctly converted to `FrameContainer`."""
-    frame = frame_truth_data
+def test_bbb_frame_container_from_df(frame_data_all):
+    """Data in DataFrame correctly converted to `FrameContainer`."""
+    frame = frame_data_all
+    union_type = frame.detectionsUnion.which()
     expected_keys = ['timestamp', ]
-    expected_keys.extend(get_detection_keys(frame.detectionsUnion.which()))
+    expected_keys.extend(get_detection_keys(union_type))
 
     arr = convert_frame_to_numpy(frame, expected_keys)
     bbb_check_frame_data(frame, arr, expected_keys)
-    truth_detections = pd.DataFrame(arr)
-    nDetections = len(frame.detectionsUnion.detectionsTruth)
+    detections = make_df_from_np(arr, union_type)
+    expected_detections = detections.copy()
+    nDetections = len(getattr(frame.detectionsUnion, union_type))
 
-    def convert_readability(df):
-        """Helper to convert readability column from binary to string."""
-        df.readability = df.readability.apply(lambda x: x.decode('UTF-8'))
-        return df
-
-    truth_detections = convert_readability(truth_detections)
     offset = 0
-
     # test minimal set
-    fc, offset = build_frame_container_from_df(truth_detections, 'detectionsTruth', offset)
+    df = detections.copy()
+    fc, offset = build_frame_container_from_df(df, union_type, offset)
     assert offset == 1
     assert fc.id == 0
     assert fc.camId == 0
-    assert fc.fromTimestamp == truth_detections.timestamp[0]
-    assert fc.toTimestamp == truth_detections.timestamp[3]
+    assert fc.fromTimestamp == expected_detections.timestamp[0]
+    assert fc.toTimestamp == expected_detections.timestamp[3]
     assert len(fc.frames) == 1
 
     frame0 = fc.frames[0]
     assert frame0.id == offset - 1
     assert frame0.frameIdx == 0
-    assert frame0.timestamp == truth_detections.timestamp[0]
-    assert len(frame0.detectionsUnion.detectionsTruth) == 4
+    assert frame0.timestamp == expected_detections.timestamp[0]
+    assert len(getattr(frame0.detectionsUnion, union_type)) == 4
 
-    detections = pd.DataFrame(convert_frame_to_numpy(frame0, expected_keys))
-    detections = convert_readability(detections)
-    assert_frame_equal(detections, truth_detections)
+    arr = convert_frame_to_numpy(frame0, expected_keys)
+    converted_detections = make_df_from_np(arr, union_type)
+    assert_frame_equal(expected_detections, converted_detections)
 
     # test without readability
-    df = truth_detections.drop('readability', axis=1)
-    fc, offset = build_frame_container_from_df(df, 'detectionsTruth', offset, frame_offset=offset)
+    df = detections.copy()
+    if union_type == 'detectionsTruth':
+        df.drop('readability', axis=1, inplace=True)
+    fc, offset = build_frame_container_from_df(df, union_type, offset, frame_offset=offset)
     assert offset == 2  # test offset and id to test for fixed assignments
     assert fc.id == 1
     assert fc.camId == 1
@@ -231,21 +249,22 @@ def test_bbb_frame_container_from_truth_data(frame_truth_data):
     assert frame0.id == offset - 1  # test if offset is considered
     assert frame0.frameIdx == 0
 
-    for i in range(0, nDetections):  # test for default readability value
-        frame0.detectionsUnion.detectionsTruth[i].readability == b'undefined'
+    if union_type == 'detectionsTruth':
+        for i in range(0, nDetections):  # test for default readability value
+            frame0.detectionsUnion.detectionsTruth[i].readability == b'undefined'
 
     # test with datetime instead of unixtimestamp
-    df = truth_detections
+    df = detections.copy()
     df.timestamp = df.timestamp.apply(lambda x: to_datetime(x))
-    fc, offset = build_frame_container_from_df(df, 'detectionsTruth', offset, frame_offset=offset)
+    fc, offset = build_frame_container_from_df(df, union_type, offset, frame_offset=offset)
     assert offset == 3
-    fc.fromTimestamp == truth_detections.timestamp[0]
+    fc.fromTimestamp == expected_detections.timestamp[0]
     assert len(fc.frames) == 1
 
     # test with additional column for frames
-    df = truth_detections
+    df = detections.copy()
     df['dataSourceIdx'] = 99
-    fc, offset = build_frame_container_from_df(df, 'detectionsTruth', offset, frame_offset=offset)
+    fc, offset = build_frame_container_from_df(df, union_type, offset, frame_offset=offset)
     assert offset == 4
     assert len(fc.frames) == 1
 
@@ -253,26 +272,26 @@ def test_bbb_frame_container_from_truth_data(frame_truth_data):
     assert frame0.dataSourceIdx == df.dataSourceIdx[0]
 
     # test with additional column for detections
-    df = truth_detections
+    df = detections.copy()
     df['xposHive'] = range(0, nDetections)
-    fc, offset = build_frame_container_from_df(df, 'detectionsTruth', offset, frame_offset=offset)
+    fc, offset = build_frame_container_from_df(df, union_type, offset, frame_offset=offset)
     assert offset == 5
     assert len(fc.frames) == 1
 
-    detections = fc.frames[0].detectionsUnion.detectionsTruth
+    converted_detections = getattr(fc.frames[0].detectionsUnion, union_type)
     for i in range(0, nDetections):
-        assert detections[i].xposHive == df.xposHive[i]
+        assert converted_detections[i].xposHive == df.xposHive[i]
 
     # test with camId column
-    df = truth_detections
+    df = detections.copy()
     df['camId'] = [offset] * df.shape[0]
     df.loc[0, 'camId'] = offset - 1
-    fc, offset = build_frame_container_from_df(df, 'detectionsTruth', offset, frame_offset=offset)
+    fc, offset = build_frame_container_from_df(df, union_type, offset, frame_offset=offset)
     assert offset == 6
     assert len(fc.frames) == 1
 
-    detections = fc.frames[0].detectionsUnion.detectionsTruth
-    assert len(detections) == nDetections - 1  # one detection removed!
+    converted_detections = getattr(fc.frames[0].detectionsUnion, union_type)
+    assert len(converted_detections) == nDetections - 1  # one detection removed!
 
 
 def test_bbb_convert_detections_to_numpy(frame_data_all):
