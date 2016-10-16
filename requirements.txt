@@ -1,9 +1,9 @@
 numpy>=1.10.2
 pandas>=0.17.1
 pytz>=2016.0
-pycapnp>=0.5.8
+pycapnp>=0.5.7
 pytest>=3.0.0
-pytest-flake8>=0.5
+pytest-flakes>=1.0.0
 coveralls>=1.1
 pytest-cov>=2.2.1
 pytest-xdist

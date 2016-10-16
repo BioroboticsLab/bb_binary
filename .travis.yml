@@ -23,7 +23,7 @@ install:
 - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION numpy scipy matplotlib
   h5py pillow scikit-image pandas six
 - source activate test-environment
-- pip install pytest pytest-benchmark pytest-cov pytest-xdist pytest-flake8
+- pip install pytest pytest-benchmark pytest-cov pytest-xdist pytest-flakes
 - pip install coveralls iso8601
 - CC=/usr/bin/gcc-4.9 CXX=/usr/bin/g++-4.9 pip install pycapnp
 - pip install -e .
