@@ -2,6 +2,7 @@
 
 [![Build Status](https://secure.travis-ci.org/BioroboticsLab/bb_binary.svg?branch=master)](http://travis-ci.org/BioroboticsLab/bb_binary)
 [![Coverage Status](https://coveralls.io/repos/github/BioroboticsLab/bb_binary/badge.svg?branch=master)](https://coveralls.io/github/BioroboticsLab/bb_binary)
+[![Documentation Status](https://readthedocs.org/projects/bb-binary/badge/?version=latest)](http://bb-binary.readthedocs.io/en/latest/?badge=latest)
 
 bb_binary contains the capnproto schema of the BeesBooks detections and the
 `bbb` tool. `bbb` is a collection of usefull tools for the  BeesBook detection data.
