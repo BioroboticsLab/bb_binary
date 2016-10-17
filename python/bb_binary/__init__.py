@@ -193,18 +193,24 @@ def int_id_to_binary(id, nb_bits=12):
 def convert_frame_to_numpy(frame, keys=None, add_cols=None):
     """Returns the frame data and detections as a numpy array from the frame.
 
-    Note: the frame id is identified in the array as frameId instead of id!
+    Note:
+        The frame id is identified in the array as ``frameId`` instead of ``id``!
 
     Args:
         frame (Frame): datastructure with frame data from capnp.
+
+    Keyword Args:
         keys (Optional iterable): only these keys are converted to the np array.
-        add_cols (Optional dictionary): additional columns for the np array,
+        add_cols (Optional dict): additional columns for the np array,
             use either a single value or a sequence of correct length.
+
+    Returns:
+        numpy array (np.array): a structured numpy array with frame and detection data.
     """
     ret_arr = None
 
     if keys is None or 'detectionsUnion' in keys:
-        detections = get_detections(frame)
+        detections = _get_detections(frame)
         ret_arr = _convert_detections_to_numpy(detections, keys)
 
     frame_arr = _convert_frame_to_numpy(frame, keys)
@@ -314,7 +320,7 @@ def _convert_detections_to_numpy(detections, keys=None):
     return detection_arr
 
 
-def get_detections(frame):
+def _get_detections(frame):
     """Extracts detections of DP, CVP or truth data from frame."""
     union_type = frame.detectionsUnion.which()
     if union_type == 'detectionsDP':
@@ -367,24 +373,28 @@ def build_frame_container(from_ts, to_ts, cam_id,
 def build_frame_container_from_df(df, union_type, cam_id, frame_offset=0):
     """Builds a frame container from a Pandas DataFrame.
 
-    Operates differently from `build_frame_container` because it will be used
+    Operates differently from :func:`build_frame_container` because it will be used
     in a different context where we have access to more data.
 
-    Column names are matched to `Frame` and `Detection*` attributes.
-    Set additional `FrameContainer` attributes like `hiveId` in the return value.
+    Column names are matched to ``Frame`` and ``Detection*`` attributes.
+    Set additional ``FrameContainer`` attributes like ``hiveId`` in the return value.
 
     Args:
         df (dataframe): dataframe with detection data
-        union_type (String): the type of detections e.g. detectionsTruth
-        cam_id (int): id of camera, also used as `FrameContainer` id
-        frame_offset (Optional int): offset for unique frame ids
+        union_type (str): the type of detections e.g. ``detectionsTruth``
+        cam_id (int): id of camera, also used as ``FrameContainer`` id
 
-     Returns:
-         FrameContainer: converted data from `df`
-         int: number of frames that could be used as `frame_offset`
+    Keyword Args:
+        frame offset (Optional int): offset for unique frame ids
+
+    Returns:
+        (tuple): tuple containing:
+
+            - **frame container** (*FrameContainer*): converted data from :attr:`df`
+            - **new offset** (*int*): number of frames that could be used as :attr:`frame_offset`
      """
     def set_attr_from(obj, src, key):
-        """Get attr `key` from `src` and set val to `obj` on same `key`"""
+        """Get attr :attr:`key` from :attr:`src` and set val to :attr:`obj` on same :attr:`key`"""
         val = getattr(src, key)
         # special handling for list type fields
         if key in list_keys:
@@ -395,7 +405,7 @@ def build_frame_container_from_df(df, union_type, cam_id, frame_offset=0):
         setattr(obj, key, val)
 
     def set_list_attr(obj, list_src, key):
-        """Initialize list `key` on `object` and set all values from `list_src`."""
+        """Initialize list :attr:`key` on :attr:`obj` and set all values from :attr:`list_src`."""
         new_list = obj.init(key, len(list_src))
         for i, val in enumerate(list_src):
             if type(val).__module__ == np.__name__:
@@ -660,8 +670,10 @@ class Repository(object):
             cam (Optional int): only yield filenames with this cam id.
 
         Returns:
-            iterator: iterator with Frames
-            FrameContainer: the corresponding FrameContainer for each frame.
+            (tuple): tuple containing:
+
+                iterator (iterable): iterator with Frames
+                FrameContainer (FrameContainer): the corresponding FrameContainer for each frame.
         """
         for f in self.iter_fnames(begin=begin, end=end, cam=cam):
             fc = load_frame_container(f)
