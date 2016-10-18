@@ -77,7 +77,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'bb_binary'
-copyright = u'2016, BioroboticsLab Fu Berlin'
+copyright = u'2016, BioroboticsLab FU Berlin'
 author = u'Benjamin Wild, Benjamin Rosemann, Leon Sixt'
 
 # The version info for the project you're documenting, acts as replacement for

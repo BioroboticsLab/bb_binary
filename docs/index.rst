@@ -5,6 +5,9 @@ Welcome to bb_binary's documentation!
    :maxdepth: 2
 
    api/init
+   api/converting
+   api/parsing
+   api/repository
 
 
 Indices and tables
