@@ -7,10 +7,10 @@ import bb_binary.parsing as p
 
 
 convert_frame_to_numpy = c.convert_frame_to_numpy
+build_frame_container = c.build_frame_container
 build_frame_container_from_df = c.build_frame_container_from_df
 
 load_frame_container = r.load_frame_container
-build_frame_container = r.build_frame_container
 Repository = r.Repository
 
 dt_to_str = p.dt_to_str

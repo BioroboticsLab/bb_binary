@@ -6,9 +6,163 @@ import numpy as np
 import numpy.lib.recfunctions as rf
 import pytz
 import six
-from bb_binary.constants import Frame, DetectionCVP, DetectionDP, DetectionTruth
+from bb_binary.constants import Frame, FrameContainer, DetectionCVP, DetectionDP, DetectionTruth
 from bb_binary.parsing import to_timestamp
-from bb_binary.repository import build_frame_container
+
+
+def build_frame_container(from_ts, to_ts, cam_id,
+                          hive_id=None,
+                          transformation_matrix=None,
+                          data_source_fname=None,
+                          video_preview_fname=None):
+    """Builds a FrameContainer
+
+    Args:
+        from_ts (int or float): Timestamp of the first frame
+        to_ts (int or float): Timestamp of the last frame
+        cam_id (int): id of camera
+
+    Keyword Args:
+        hive_id (Optional int): id of the hive
+        transformation_matrix (Optional iterable with floats): Transformation matrix for coordinates
+        data_source_fname (Optional str or list of str): Filename(s) of the data source(s).
+        video_preview_fname (Optional str or list of str): Filename(s) of preview videos.
+            Have to allign to :attr:`data_source_fname`!
+    """
+    fco = FrameContainer.new_message()
+    fco.fromTimestamp = from_ts
+    fco.toTimestamp = to_ts
+    fco.camId = cam_id
+    if isinstance(video_preview_fname, six.string_types):
+        video_preview_fname = [video_preview_fname]
+    if isinstance(data_source_fname, six.string_types):
+        data_source_fname = [data_source_fname]
+    if data_source_fname is not None:
+        # make empty list of strings if no video preview filename is given
+        data_sources = fco.init('dataSources', len(data_source_fname))
+        for i, filename in enumerate(data_source_fname):
+            data_sources[i].filename = filename
+            if video_preview_fname is not None:
+                data_sources[i].videoPreviewFilename = video_preview_fname[i]
+    if hive_id is not None:
+        fco.hiveId = hive_id
+    if transformation_matrix is not None:
+        fco.transformationMatrix = transformation_matrix
+    return fco
+
+
+def build_frame_container_from_df(dfr, union_type, cam_id, frame_offset=0):
+    """Builds a frame container from a Pandas DataFrame.
+
+    Operates differently from :func:`build_frame_container` because it will be used
+    in a different context where we have access to more data.
+
+    Column names are matched to ``Frame`` and ``Detection*`` attributes.
+    Set additional ``FrameContainer`` attributes like ``hiveId`` in the return value.
+
+    Args:
+        dfr (dataframe): dataframe with detection data
+        union_type (str): the type of detections e.g. ``detectionsTruth``
+        cam_id (int): id of camera, also used as ``FrameContainer`` id
+
+    Keyword Args:
+        frame offset (Optional int): offset for unique frame ids
+
+    Returns:
+        (tuple): tuple containing:
+
+            - **frame container** (*FrameContainer*): converted data from :attr:`dfr`
+            - **new offset** (*int*): number of frames that could be used as :attr:`frame_offset`
+     """
+    def set_attr_from(obj, src, key):
+        """Get attr :attr:`key` from :attr:`src` and set val to :attr:`obj` on same :attr:`key`"""
+        val = getattr(src, key)
+        # special handling for list type fields
+        if key in list_keys:
+            set_list_attr(obj, val, key)
+            return
+        if type(val).__module__ == np.__name__:
+            val = np.asscalar(val)
+        setattr(obj, key, val)
+
+    def set_list_attr(obj, list_src, key):
+        """Initialize list :attr:`key` on :attr:`obj` and set all values from :attr:`list_src`."""
+        new_list = obj.init(key, len(list_src))
+        for i, val in enumerate(list_src):
+            if type(val).__module__ == np.__name__:
+                val = np.asscalar(val)
+            new_list[i] = val
+
+    detection = {
+        'detectionsCVP': DetectionCVP.new_message(),
+        'detectionsDP': DetectionDP.new_message(),
+        'detectionsTruth': DetectionTruth.new_message()
+    }[union_type]
+
+    # check that we have all the information we need
+    skip_keys = frozenset(['readability', 'xposHive', 'yposHive', 'frameIdx', 'idx'])
+    minimal_keys = set(detection.to_dict().keys()) - skip_keys
+    list_keys = set()
+    # for some reasons lists are not considered when using to_dict()!
+    if union_type == 'detectionsDP':
+        minimal_keys = minimal_keys | set(['decodedId'])
+        list_keys = list_keys | set(['decodedId', 'descriptor'])
+    available_keys = set(dfr.keys())
+    assert minimal_keys <= available_keys,\
+        "Missing keys {} in DataFrame.".format(minimal_keys - available_keys)
+
+    # select only entries for cam
+    if 'camId' in available_keys:
+        dfr = dfr[dfr.camId == cam_id].copy()
+
+    # convert timestamp to unixtimestamp
+    if 'datetime' in dfr.dtypes.timestamp.name:
+        dfr.loc[:, 'timestamp'] = dfr.loc[:, 'timestamp'].apply(
+            lambda t: to_timestamp(datetime(
+                t.year, t.month, t.day, t.hour, t.minute, t.second,
+                t.microsecond, tzinfo=pytz.utc)))
+
+    # convert decodedId from float to integers (if necessary)
+    if 'decodedId' in available_keys and union_type == 'detectionsDP' and\
+       np.all(np.array(dfr.loc[dfr.index[0], 'decodedId']) < 1.1):
+        dfr.loc[:, 'decodedId'] = dfr.loc[:, 'decodedId'].apply(
+            lambda l: [int(round(fid * 255.)) for fid in l])
+
+    # create frame container
+    tstamps = dfr.timestamp.unique()
+    start = np.asscalar(min(tstamps))
+    end = np.asscalar(max(tstamps))
+    new_frame_offset = frame_offset + len(tstamps)
+
+    fco = build_frame_container(start, end, cam_id)
+    fco.id = cam_id  # overwrite if necessary!
+    fco.init('frames', len(tstamps))
+
+    # determine which fields we could assign from dataframe to cap'n proto
+    frame = Frame.new_message()
+    frame_fields = [field for field in available_keys if hasattr(frame, field)]
+
+    detection_fields = [field for field in available_keys if hasattr(detection, field)]
+
+    # create frames (each timestamp maps to a frame)
+    for frame_idx, (_, detections) in enumerate(dfr.groupby(by='timestamp')):
+        frame = fco.frames[frame_idx]
+        frame.id = frame_offset + frame_idx
+        frame.frameIdx = frame_idx
+
+        # take first row, assumes that cols `frame_fields` have unique values!
+        for key in frame_fields:
+            set_attr_from(frame, detections.iloc[0], key)
+
+        # create detections
+        frame.detectionsUnion.init(union_type, detections.shape[0])
+        for detection_idx, row in enumerate(detections.itertuples(index=False)):
+            detection = getattr(frame.detectionsUnion, union_type)[detection_idx]
+            detection.idx = detection_idx
+            for key in detection_fields:
+                set_attr_from(detection, row, key)
+
+    return fco, new_frame_offset
 
 
 def convert_frame_to_numpy(frame, keys=None, add_cols=None):
@@ -153,117 +307,3 @@ def _get_detections(frame):
     else:
         raise KeyError("Type {0} not supported.".format(union_type))  # pragma: no cover
     return detections
-
-
-def build_frame_container_from_df(dfr, union_type, cam_id, frame_offset=0):
-    """Builds a frame container from a Pandas DataFrame.
-
-    Operates differently from :func:`build_frame_container` because it will be used
-    in a different context where we have access to more data.
-
-    Column names are matched to ``Frame`` and ``Detection*`` attributes.
-    Set additional ``FrameContainer`` attributes like ``hiveId`` in the return value.
-
-    Args:
-        dfr (dataframe): dataframe with detection data
-        union_type (str): the type of detections e.g. ``detectionsTruth``
-        cam_id (int): id of camera, also used as ``FrameContainer`` id
-
-    Keyword Args:
-        frame offset (Optional int): offset for unique frame ids
-
-    Returns:
-        (tuple): tuple containing:
-
-            - **frame container** (*FrameContainer*): converted data from :attr:`dfr`
-            - **new offset** (*int*): number of frames that could be used as :attr:`frame_offset`
-     """
-    def set_attr_from(obj, src, key):
-        """Get attr :attr:`key` from :attr:`src` and set val to :attr:`obj` on same :attr:`key`"""
-        val = getattr(src, key)
-        # special handling for list type fields
-        if key in list_keys:
-            set_list_attr(obj, val, key)
-            return
-        if type(val).__module__ == np.__name__:
-            val = np.asscalar(val)
-        setattr(obj, key, val)
-
-    def set_list_attr(obj, list_src, key):
-        """Initialize list :attr:`key` on :attr:`obj` and set all values from :attr:`list_src`."""
-        new_list = obj.init(key, len(list_src))
-        for i, val in enumerate(list_src):
-            if type(val).__module__ == np.__name__:
-                val = np.asscalar(val)
-            new_list[i] = val
-
-    detection = {
-        'detectionsCVP': DetectionCVP.new_message(),
-        'detectionsDP': DetectionDP.new_message(),
-        'detectionsTruth': DetectionTruth.new_message()
-    }[union_type]
-
-    # check that we have all the information we need
-    skip_keys = frozenset(['readability', 'xposHive', 'yposHive', 'frameIdx', 'idx'])
-    minimal_keys = set(detection.to_dict().keys()) - skip_keys
-    list_keys = set()
-    # for some reasons lists are not considered when using to_dict()!
-    if union_type == 'detectionsDP':
-        minimal_keys = minimal_keys | set(['decodedId'])
-        list_keys = list_keys | set(['decodedId', 'descriptor'])
-    available_keys = set(dfr.keys())
-    assert minimal_keys <= available_keys,\
-        "Missing keys {} in DataFrame.".format(minimal_keys - available_keys)
-
-    # select only entries for cam
-    if 'camId' in available_keys:
-        dfr = dfr[dfr.camId == cam_id].copy()
-
-    # convert timestamp to unixtimestamp
-    if 'datetime' in dfr.dtypes.timestamp.name:
-        dfr.loc[:, 'timestamp'] = dfr.loc[:, 'timestamp'].apply(
-            lambda t: to_timestamp(datetime(
-                t.year, t.month, t.day, t.hour, t.minute, t.second,
-                t.microsecond, tzinfo=pytz.utc)))
-
-    # convert decodedId from float to integers (if necessary)
-    if 'decodedId' in available_keys and union_type == 'detectionsDP' and\
-       np.all(np.array(dfr.loc[dfr.index[0], 'decodedId']) < 1.1):
-        dfr.loc[:, 'decodedId'] = dfr.loc[:, 'decodedId'].apply(
-            lambda l: [int(round(fid * 255.)) for fid in l])
-
-    # create frame container
-    tstamps = dfr.timestamp.unique()
-    start = np.asscalar(min(tstamps))
-    end = np.asscalar(max(tstamps))
-    new_frame_offset = frame_offset + len(tstamps)
-
-    fco = build_frame_container(start, end, cam_id)
-    fco.id = cam_id  # overwrite if necessary!
-    fco.init('frames', len(tstamps))
-
-    # determine which fields we could assign from dataframe to cap'n proto
-    frame = Frame.new_message()
-    frame_fields = [field for field in available_keys if hasattr(frame, field)]
-
-    detection_fields = [field for field in available_keys if hasattr(detection, field)]
-
-    # create frames (each timestamp maps to a frame)
-    for frame_idx, (_, detections) in enumerate(dfr.groupby(by='timestamp')):
-        frame = fco.frames[frame_idx]
-        frame.id = frame_offset + frame_idx
-        frame.frameIdx = frame_idx
-
-        # take first row, assumes that cols `frame_fields` have unique values!
-        for key in frame_fields:
-            set_attr_from(frame, detections.iloc[0], key)
-
-        # create detections
-        frame.detectionsUnion.init(union_type, detections.shape[0])
-        for detection_idx, row in enumerate(detections.itertuples(index=False)):
-            detection = getattr(frame.detectionsUnion, union_type)[detection_idx]
-            detection.idx = detection_idx
-            for key in detection_fields:
-                set_attr_from(detection, row, key)
-
-    return fco, new_frame_offset

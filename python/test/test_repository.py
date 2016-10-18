@@ -4,57 +4,11 @@
 import os
 import math
 from datetime import datetime
-import numpy as np
 import pytz
 from conftest import fill_repository
 from bb_binary.constants import Frame
-from bb_binary.parsing import to_timestamp
-from bb_binary.repository import Repository, build_frame_container
-
-
-def test_bbb_build_frame_container():
-    """Tests the generation of a ``FrameContainer`` via function."""
-    # very simple case
-    fc = build_frame_container(0, 1, 0)
-    assert fc.camId == 0
-    assert fc.fromTimestamp == 0
-    assert fc.toTimestamp == 1
-
-    t1 = to_timestamp(datetime(1970, 1, 1, tzinfo=pytz.utc))
-    t2 = to_timestamp(datetime(2015, 8, 15, 12, 0, 40, tzinfo=pytz.utc))
-
-    # more advanced
-    fc = build_frame_container(t1, t2, 1)
-    assert fc.camId == 1
-    assert fc.fromTimestamp == t1
-    assert fc.toTimestamp == t2
-
-    # try to set every parameter
-    tfm = [1./3, 2.5, 4]
-    fc = build_frame_container(t1, t2, 1, hive_id=5, transformation_matrix=tfm,
-                               data_source_fname="testname")
-    assert fc.hiveId == 5
-    assert np.all(np.isclose(fc.transformationMatrix, tfm))
-    assert len(fc.dataSources) == 1
-    assert fc.dataSources[0].filename == "testname"
-    assert fc.dataSources[0].videoPreviewFilename == ""
-
-    # filename and video are both strings
-    fc = build_frame_container(t1, t2, 1, data_source_fname="testname",
-                               video_preview_fname="test_video_name")
-    assert len(fc.dataSources) == 1
-    assert fc.dataSources[0].filename == "testname"
-    assert fc.dataSources[0].videoPreviewFilename == "test_video_name"
-
-    # try combination of filenames and preview names
-    fnames = ["testname", "testname 1"]
-    vnames = ["test_video_name", "test_video_name 1"]
-    fc = build_frame_container(t1, t2, 1, data_source_fname=fnames, video_preview_fname=vnames)
-    assert len(fc.dataSources) == 2
-    assert fc.dataSources[0].filename == "testname"
-    assert fc.dataSources[0].videoPreviewFilename == "test_video_name"
-    assert fc.dataSources[1].filename == "testname 1"
-    assert fc.dataSources[1].videoPreviewFilename == "test_video_name 1"
+from bb_binary.converting import build_frame_container
+from bb_binary.repository import Repository
 
 
 def test_bbb_is_loaded():

@@ -1,14 +1,16 @@
 # -*- coding: utf-8 -*-
 """Tests convenience functions to convert bb_binary data to structured NumPy Arrays."""
 # pylint:disable=redefined-outer-name
+from datetime import datetime
 import numpy as np
 import pandas as pd
 from pandas.util.testing import assert_frame_equal
 import pytest
+import pytz
 from bb_binary.constants import Frame
-from bb_binary.converting import build_frame_container_from_df, \
+from bb_binary.converting import build_frame_container, build_frame_container_from_df, \
     convert_frame_to_numpy, _convert_detections_to_numpy, _convert_frame_to_numpy, _get_detections
-from bb_binary.parsing import to_datetime
+from bb_binary.parsing import to_datetime, to_timestamp
 
 
 @pytest.fixture
@@ -126,6 +128,51 @@ def make_df_from_np(np_arr, union_type):
     if union_type == 'detectionsTruth':
         detections = convert_readability(detections)
     return detections
+
+
+def test_bbb_build_frame_container():
+    """Tests the generation of a ``FrameContainer`` via function."""
+    # very simple case
+    fco = build_frame_container(0, 1, 0)
+    assert fco.camId == 0
+    assert fco.fromTimestamp == 0
+    assert fco.toTimestamp == 1
+
+    ts1 = to_timestamp(datetime(1970, 1, 1, tzinfo=pytz.utc))
+    ts2 = to_timestamp(datetime(2015, 8, 15, 12, 0, 40, tzinfo=pytz.utc))
+
+    # more advanced
+    fco = build_frame_container(ts1, ts2, 1)
+    assert fco.camId == 1
+    assert fco.fromTimestamp == ts1
+    assert fco.toTimestamp == ts2
+
+    # try to set every parameter
+    tfm = [1./3, 2.5, 4]
+    fco = build_frame_container(ts1, ts2, 1, hive_id=5, transformation_matrix=tfm,
+                                data_source_fname="testname")
+    assert fco.hiveId == 5
+    assert np.all(np.isclose(fco.transformationMatrix, tfm))
+    assert len(fco.dataSources) == 1
+    assert fco.dataSources[0].filename == "testname"
+    assert fco.dataSources[0].videoPreviewFilename == ""
+
+    # filename and video are both strings
+    fco = build_frame_container(ts1, ts2, 1, data_source_fname="testname",
+                                video_preview_fname="test_video_name")
+    assert len(fco.dataSources) == 1
+    assert fco.dataSources[0].filename == "testname"
+    assert fco.dataSources[0].videoPreviewFilename == "test_video_name"
+
+    # try combination of filenames and preview names
+    fnames = ["testname", "testname 1"]
+    vnames = ["test_video_name", "test_video_name 1"]
+    fco = build_frame_container(ts1, ts2, 1, data_source_fname=fnames, video_preview_fname=vnames)
+    assert len(fco.dataSources) == 2
+    assert fco.dataSources[0].filename == "testname"
+    assert fco.dataSources[0].videoPreviewFilename == "test_video_name"
+    assert fco.dataSources[1].filename == "testname 1"
+    assert fco.dataSources[1].videoPreviewFilename == "test_video_name 1"
 
 
 def test_bbb_frame_container_errors(frame_data_all):

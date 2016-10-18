@@ -23,47 +23,6 @@ def _mkdir_p(path):
             raise
 
 
-def build_frame_container(from_ts, to_ts, cam_id,
-                          hive_id=None,
-                          transformation_matrix=None,
-                          data_source_fname=None,
-                          video_preview_fname=None):
-    """Builds a FrameContainer
-
-    Args:
-        from_ts (int or float): Timestamp of the first frame
-        to_ts (int or float): Timestamp of the last frame
-        cam_id (int): id of camera
-
-    Keyword Args:
-        hive_id (Optional int): id of the hive
-        transformation_matrix (Optional iterable with floats): Transformation matrix for coordinates
-        data_source_fname (Optional str or list of str): Filename(s) of the data source(s).
-        video_preview_fname (Optional str or list of str): Filename(s) of preview videos.
-            Have to allign to :attr:`data_source_fname`!
-    """
-    fco = FrameContainer.new_message()
-    fco.fromTimestamp = from_ts
-    fco.toTimestamp = to_ts
-    fco.camId = cam_id
-    if isinstance(video_preview_fname, six.string_types):
-        video_preview_fname = [video_preview_fname]
-    if isinstance(data_source_fname, six.string_types):
-        data_source_fname = [data_source_fname]
-    if data_source_fname is not None:
-        # make empty list of strings if no video preview filename is given
-        data_sources = fco.init('dataSources', len(data_source_fname))
-        for i, filename in enumerate(data_source_fname):
-            data_sources[i].filename = filename
-            if video_preview_fname is not None:
-                data_sources[i].videoPreviewFilename = video_preview_fname[i]
-    if hive_id is not None:
-        fco.hiveId = hive_id
-    if transformation_matrix is not None:
-        fco.transformationMatrix = transformation_matrix
-    return fco
-
-
 def load_frame_container(fname):
     """Loads frame container from this filename"""
     with open(fname, 'rb') as f:
