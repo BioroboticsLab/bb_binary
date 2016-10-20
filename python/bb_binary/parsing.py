@@ -87,10 +87,21 @@ def parse_image_fname_beesbook(fname):
 
 def parse_image_fname_iso(fname):
     basename = os.path.basename(fname)
-    name = basename.split('.')[0]
-    _, camIdxStr, iso_str = name.split('_')
-    dt = iso8601.parse_date(iso_str)
-    return int(camIdxStr), dt
+    name_splitted = basename.split('.')
+
+    def parse_name(name):
+        _, camIdxStr, iso_str = name.split('_')
+        dt = iso8601.parse_date(iso_str)
+        return int(camIdxStr), dt
+
+    try:
+        name = '.'.join(name_splitted[:2])
+        camIdx, dt = parse_name(name)
+    except iso8601.ParseError:
+        name = name_splitted[0]
+        camIdx, dt = parse_name(name)
+
+    return camIdx, dt
 
 
 def parse_image_fname(fname, format='auto'):
