@@ -22,7 +22,7 @@ setup(
     package_data={'bb_binary': ['*.capnp']},
     entry_points={
         'console_scripts': [
-            'bb_gt_to_hdf5 = bb_binary.gt_to_hdf5:run',
+            'bb_gt_to_hdf5 = bb_binary.scripts.gt_to_hdf5:run',
         ]
     }
 )
