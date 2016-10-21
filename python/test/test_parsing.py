@@ -80,17 +80,21 @@ def test_int_id_to_binary():
     assert 'overflows' in str(exception_information.value)
 
 
-@pytest.fixture(params=['iso', 'beesbook', 'auto_iso', 'auto_bb', 'arbitrary'])
+@pytest.fixture(params=['iso', 'beesbook', 'auto_iso', 'auto_bb', 'arbitrary', 'iso_old'])
 def image(request):
     """Fixture to test extraction of information on different image filenames."""
     name_beesbook = 'Cam_0_20140805151756_200.jpeg'
     name_iso = 'Cam_0_2014-08-05T13:17:56.000200Z.jpeg'
+    name_iso_old = 'Cam_0_2014-08-05T13:17:56,000200Z.jpeg'
     expected_dt = datetime(2014, 8, 5, 13, 17, 56, 200, tzinfo=pytz.utc)
     expected_cam = 0
     data = {'dt': expected_dt, 'cam': expected_cam, 'format': 'beesbook', 'name': name_beesbook}
     if 'iso' in request.param:
         data['format'] = 'iso'
-        data['name'] = name_iso
+        if 'old' in request.param:
+            data['name'] = name_iso_old
+        else:
+            data['name'] = name_iso
     elif 'beesbook' not in request.param:
         data['format'] = 'arbitrary'
 
