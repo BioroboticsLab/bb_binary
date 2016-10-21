@@ -14,8 +14,9 @@ def test_dt_to_str():
     dt = datetime(2015, 8, 15, 12, 0, 40, 333967, tzinfo=pytz.utc)
     assert dt_to_str(dt) == "2015-08-15T12:00:40.333967Z"
 
-    with pytest.raises(Exception, message="Got a datetime object not in UTC. Allways use UTC."):
+    with pytest.raises(Exception) as excinfo:
         dt_to_str(dt.replace(tzinfo=None))
+    assert str(excinfo.value) == "Got a datetime object not in UTC. Allways use UTC."
 
 
 def test_get_fname():
