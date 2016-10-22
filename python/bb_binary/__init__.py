@@ -33,4 +33,4 @@ parse_image_fname_iso = parsing.parse_image_fname
 parse_image_fname_beesbook = parsing.parse_image_fname_beesbook
 parse_video_fname = parsing.parse_video_fname
 to_datetime = parsing.to_datetime
-to_timestamp = parsing.to_datetime
+to_timestamp = parsing.to_timestamp
