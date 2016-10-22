@@ -5,7 +5,7 @@ from datetime import datetime
 import numpy as np
 import pytz
 import pytest
-from bb_binary.parsing import parse_cam_id, parse_fname, parse_video_fname, parse_image_fname, \
+from bb_binary import parse_cam_id, parse_fname, parse_video_fname, parse_image_fname, \
     dt_to_str, to_datetime, to_timestamp, int_id_to_binary, get_fname, get_video_fname
 
 

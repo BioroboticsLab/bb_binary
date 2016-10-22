@@ -7,10 +7,14 @@ import pandas as pd
 from pandas.util.testing import assert_frame_equal
 import pytest
 import pytz
-from bb_binary.constants import Frame
-from bb_binary.converting import build_frame_container, build_frame_container_from_df, \
-    convert_frame_to_numpy, _convert_detections_to_numpy, _convert_frame_to_numpy, _get_detections
-from bb_binary.parsing import to_datetime, to_timestamp
+# constants
+from bb_binary import Frame
+# converting
+from bb_binary import build_frame_container, build_frame_container_from_df, convert_frame_to_numpy
+from bb_binary.converting import _convert_detections_to_numpy, _convert_frame_to_numpy, \
+        _get_detections
+# parsing
+from bb_binary import to_datetime, to_timestamp
 
 
 @pytest.fixture

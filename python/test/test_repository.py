@@ -6,9 +6,12 @@ import math
 from datetime import datetime
 import pytz
 from conftest import fill_repository
-from bb_binary.constants import Frame
-from bb_binary.converting import build_frame_container
-from bb_binary.repository import Repository
+# constants
+from bb_binary import Frame
+# converting
+from bb_binary import build_frame_container
+# repository
+from bb_binary import Repository
 
 
 def test_bbb_is_loaded():
