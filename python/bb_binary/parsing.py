@@ -34,15 +34,26 @@ def get_timezone():
     return _TIMEZONE
 
 
-def int_id_to_binary(id, nb_bits=12):
+def int_id_to_binary(int_id, nb_bits=12):
+    """Helper to convert an id represented as integer to a bit array.
+
+    Arguments:
+        int_id (int): the integer id to convert to a bit array
+
+    Keyword Arguments:
+        nb_bits (int, optional): number of bits in the bit array
+
+    Returns:
+        :obj:`np.array`: the bit array in big-endian notation
+    """
     result = np.zeros(nb_bits, dtype=np.uint8)
-    if id >= 2**nb_bits:
-        raise Exception("Id overflows {} bits".format(nb_bits))
-    a = nb_bits - 1
-    while a >= 0:
-        result[a] = id & 1
-        id >>= 1
-        a -= 1
+    if int_id >= 2**nb_bits:
+        raise Exception("Id {} overflows {} bits".format(int_id, nb_bits))
+    pos = nb_bits - 1
+    while pos >= 0:
+        result[pos] = int_id & 1
+        int_id >>= 1
+        pos -= 1
     return result
 
 

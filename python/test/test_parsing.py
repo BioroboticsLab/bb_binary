@@ -75,9 +75,26 @@ def test_int_id_to_binary():
     assert np.all(bit_arr == np.array([1, 1, 1, 1, 1, 1,
                                        1, 1, 1, 1, 1, 1], dtype=np.uint8))
 
+    beeid_digits = 12
+    # test setting of single bits
+    expected_result = np.zeros((beeid_digits, beeid_digits), int)
+    np.fill_diagonal(expected_result, 1)
+    expected_result = np.fliplr(expected_result)
+
+    result = np.zeros_like(expected_result)
+    for i in range(0, beeid_digits):
+        result[i] = int_id_to_binary(2**i, nb_bits=beeid_digits)
+
+    assert np.array_equal(result, expected_result)
+
+    # correct conversion of all integers in range
+    for i in range(0, 2**beeid_digits):
+        bit_array = int_id_to_binary(i, nb_bits=beeid_digits)
+        assert beeid_digits == len(bit_array)
+        assert i == sum([m * 2**n for (n, m) in enumerate(bit_array[::-1])])
+
     with pytest.raises(Exception) as exception_information:  # to big value
         bit_arr = int_id_to_binary(8096)
-
     assert 'overflows' in str(exception_information.value)
 
 
