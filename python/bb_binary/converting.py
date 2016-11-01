@@ -1,5 +1,75 @@
 # -*- coding: utf-8 -*-
-"""Converter"""
+"""
+You might use converting functions to generate a :class:`.repository.Repository` from existing data
+or to read a :class:`.repository.Repository` into datastructures to analyse them.
+
+
+Convert to Numpy Array or Pandas DataFrame
+------------------------------------------
+
+To generate NumPy Arrays or Pandas DataFrames we provide a simple convenience function. Here is
+an example how to read all the frames and detection data::
+
+    import numpy as np
+    import pandas as pd
+    from bb_binary import Repository, convert_frame_to_numpy
+
+    repo = Repository("some/path/to/a/repo")
+
+    arr = None
+    for frame, fc in repo.iter_frames():
+        tmp = convert_frame_to_numpy(frame)
+        arr = tmp if arr is None else np.hstack((arr, tmp))
+
+Sometimes we also need fields from the :obj:`.constants.FrameContainer`. You can add those
+fields using the `add_cols` argument. This works for every other singular values or lists::
+
+    arr = None
+    for frame, fc in repo.iter_frames():
+        tmp = convert_frame_to_numpy(frame, add_cols={'camId': fc.camId})
+        arr = tmp if arr is None else np.hstack((arr, tmp))
+
+It is also possible to restrict the output to a set of fields that should be extracted.
+When using the `keys` argument you need to specify `detectionsUnion` as :obj:`.constants.Frame`
+key when you want to extract detections::
+
+    arr = None
+    frame_keys = ('frameId', 'frameIdx', 'timedelta', 'timestamp', 'dataSourceIdx')
+    detection_keys = ('idx', 'xpos', 'ypos')
+    keys = frame_keys + detection_keys
+    for frame, fc in repo.iter_frames():
+        tmp = convert_frame_to_numpy(frame, keys=keys + ('detectionsUnion',))
+        arr = tmp if arr is None else np.hstack((arr, tmp))
+
+Assuming that we have standard pipeline output with :obj:`.constants.DetectionDP` we have to
+convert list like fields separately when converting from Numpy Array to Pandas DataFrame::
+
+    list_like_fields = set(['decodedId', 'descriptor'])
+    data = pd.DataFrame(arr[list(set(arr.dtype.fields.keys()) - list_like_fields)])
+    for field in list_like_fields:
+        data[field] = pd.Series([list(list_field) for list_field in arr[field]])
+
+Convert a Repository from a Pandas DataFrame
+--------------------------------------------
+
+When you have data from other sources like Ground Truth Data, or you need to generate a
+:class:`.repository.Repository` for testing purposes or feature evaluation you might need this
+converting function. All the column names in the Pandas DataFrame are matched to field names.
+You have to specify the `detectionUnion` type and also the camera id, because each
+:obj:`.constants.FrameContainer` is specific for a camera.
+
+The `frame_offset` is used to generate unique :obj:`.constants.Frame` ids::
+
+    from bb_binary import Repository, build_frame_container_from_df
+    cam_ids = (0, 2)
+    offset = 0
+    for cid in cam_ids:
+        fc, offset = build_frame_container_from_df(df, 'detectionsTruth', cid, frame_offset=offset)
+        repo.add(fc)
+
+Function Documentation
+----------------------
+"""
 # pylint:disable=no-member
 from datetime import datetime
 import numpy as np
@@ -15,7 +85,7 @@ def build_frame_container(from_ts, to_ts, cam_id,
                           transformation_matrix=None,
                           data_source_fname=None,
                           video_preview_fname=None):
-    """Builds a FrameContainer
+    """Builds a :obj:`.constants.FrameContainer`
 
     Args:
         from_ts (int or float): Timestamp of the first frame
@@ -27,7 +97,7 @@ def build_frame_container(from_ts, to_ts, cam_id,
         transformation_matrix (Optional iterable with floats): Transformation matrix for coordinates
         data_source_fname (Optional str or list of str): Filename(s) of the data source(s).
         video_preview_fname (Optional str or list of str): Filename(s) of preview videos.
-            Have to allign to :attr:`data_source_fname`!
+            Have to allign to `data_source_fname`!
     """
     fco = FrameContainer.new_message()
     fco.fromTimestamp = from_ts
@@ -52,27 +122,27 @@ def build_frame_container(from_ts, to_ts, cam_id,
 
 
 def build_frame_container_from_df(dfr, union_type, cam_id, frame_offset=0):
-    """Builds a frame container from a Pandas DataFrame.
+    """Builds a :obj:`.constants.FrameContainer` from a Pandas DataFrame.
 
     Operates differently from :func:`build_frame_container` because it will be used
     in a different context where we have access to more data.
 
-    Column names are matched to ``Frame`` and ``Detection*`` attributes.
-    Set additional ``FrameContainer`` attributes like ``hiveId`` in the return value.
+    Column names are matched to :obj:`.constants.Frame` and `Detection*` attributes.
+    Set additional :obj:`.constants.FrameContainer` attributes like `hiveId` in the return value.
 
     Args:
-        dfr (dataframe): dataframe with detection data
-        union_type (str): the type of detections e.g. ``detectionsTruth``
-        cam_id (int): id of camera, also used as ``FrameContainer`` id
+        dfr (:obj:`pd.DataFrame`): Pandas dataframe with detection data
+        union_type (str): the type of detections e.g. `detectionsTruth`
+        cam_id (int): id of camera, also used as :obj:`.constants.FrameContainer` id
 
     Keyword Args:
         frame offset (Optional int): offset for unique frame ids
 
     Returns:
-        (tuple): tuple containing:
+        tuple: tuple containing:
 
-            - **frame container** (*FrameContainer*): converted data from :attr:`dfr`
-            - **new offset** (*int*): number of frames that could be used as :attr:`frame_offset`
+            - **frame container** (:obj:`.constants.FrameContainer`): converted data from `dfr`
+            - **new offset** (:obj:`int`): number of frames (could be used as `frame_offset`)
      """
     def set_attr_from(obj, src, key):
         """Get attr :attr:`key` from :attr:`src` and set val to :attr:`obj` on same :attr:`key`"""
@@ -166,10 +236,10 @@ def build_frame_container_from_df(dfr, union_type, cam_id, frame_offset=0):
 
 
 def convert_frame_to_numpy(frame, keys=None, add_cols=None):
-    """Returns the frame data and detections as a numpy array from the frame.
+    """Returns the frame data and detections as a numpy array from the `frame`.
 
     Note:
-        The frame id is identified in the array as ``frameId`` instead of ``id``!
+        The frame id is identified in the array as `frameId` instead of `id`!
 
     Args:
         frame (Frame): datastructure with frame data from capnp.

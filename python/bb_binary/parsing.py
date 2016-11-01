@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+"""Parsing"""
 import os
 from datetime import datetime
 import numpy as np
@@ -37,11 +38,15 @@ def get_timezone():
 def int_id_to_binary(int_id, nb_bits=12):
     """Helper to convert an id represented as integer to a bit array.
 
+    Warning:
+        This function uses big-endian notation whereas :obj:`.constants.DetectionDP` uses
+        little-endian notation for `decodedId`.
+
     Arguments:
         int_id (int): the integer id to convert to a bit array
 
     Keyword Arguments:
-        nb_bits (int, optional): number of bits in the bit array
+        nb_bits (Optional int): number of bits in the bit array
 
     Returns:
         :obj:`np.array`: the bit array in big-endian notation

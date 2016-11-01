@@ -24,7 +24,7 @@ def _mkdir_p(path):
 
 
 def load_frame_container(fname):
-    """Loads frame container from this filename"""
+    """Loads :obj:`.constants.FrameContainer` from this filename."""
     with open(fname, 'rb') as f:
         return FrameContainer.read(f)
 
@@ -67,7 +67,7 @@ class Repository(object):
 
     def add(self, frame_container):
         """
-        Adds the `frame_container` to the repository.
+        Adds the `frame_container` of type :obj:`.constants.FrameContainer` to the repository.
         """
         begin = frame_container.fromTimestamp
         end = frame_container.toTimestamp
@@ -78,8 +78,7 @@ class Repository(object):
 
     def open(self, timestamp, cam_id):
         """
-        Finds and load the FrameContainer that matches the timestamp and the
-        cam_id.
+        Finds and load the :obj:`.constants.FrameContainer` that matches the timestamp and cam_id.
         """
         fnames = self.find(timestamp)
         for fname in fnames:
