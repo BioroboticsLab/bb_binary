@@ -1,8 +1,8 @@
-bb_binary
+Common
 =========
 
 
-.. automodule:: bb_binary
+.. automodule:: bb_binary.common
     :members:
     :undoc-members:
     :show-inheritance:

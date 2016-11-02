@@ -1,5 +1,10 @@
 # -*- coding: utf-8 -*-
-"""Parsing"""
+"""
+This submodule contains a collection of helper to parse filenames and some fields in
+*bb_binary* repositories to Python datastructures.
+
+There are also some helper to convert some data representations like timeformats or ids.
+"""
 import os
 from datetime import datetime
 import numpy as np
@@ -39,7 +44,7 @@ def int_id_to_binary(int_id, nb_bits=12):
     """Helper to convert an id represented as integer to a bit array.
 
     Warning:
-        This function uses big-endian notation whereas :obj:`.constants.DetectionDP` uses
+        This function uses big-endian notation whereas :obj:`.DetectionDP` uses
         little-endian notation for `decodedId`.
 
     Arguments:

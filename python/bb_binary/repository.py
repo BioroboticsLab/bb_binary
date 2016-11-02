@@ -1,5 +1,14 @@
 # -*- coding: utf-8 -*-
-"""The Repository class allows to read and write to *bb_binary* data stores."""
+"""
+The Repository class allows to read and write to *bb_binary* data stores.
+
+The *bb_binary* data is splitted into several files that are organized in subfolders via date and
+time. A :class:`.Repository` manages these *bb_binary* datafiles and provides methods to
+**add** new :obj:`.FrameContainer`, or iterate through :obj:`.Frame`.
+
+This class provides performant access to a *bb_binary* data store but you will have to parse
+the data by yourself. You might use some helpers from :doc:`parsing`.
+"""
 import os
 import errno
 import json
@@ -8,9 +17,9 @@ from datetime import datetime, timedelta
 import pytz
 import six
 
-from bb_binary.constants import FrameContainer, CAM_IDX, BEGIN_IDX
-from bb_binary.parsing import get_video_fname, to_datetime, parse_cam_id, \
-    parse_video_fname, parse_image_fname_iso
+from .common import FrameContainer, CAM_IDX, BEGIN_IDX
+from .parsing import get_video_fname, to_datetime, parse_cam_id, parse_video_fname, \
+    parse_image_fname_iso
 
 
 def _mkdir_p(path):
@@ -24,13 +33,13 @@ def _mkdir_p(path):
 
 
 def load_frame_container(fname):
-    """Loads :obj:`.constants.FrameContainer` from this filename."""
+    """Loads :obj:`.FrameContainer` from this filename."""
     with open(fname, 'rb') as f:
         return FrameContainer.read(f)
 
 
 class Repository(object):
-    """The Repository class manages multiple bb_binary files. It creates a
+    """The Repository class manages multiple *bb_binary* files. It creates a
     directory layout that enables fast access by the timestamp.
     """
 
@@ -66,8 +75,7 @@ class Repository(object):
                 self._save_json()
 
     def add(self, frame_container):
-        """
-        Adds the `frame_container` of type :obj:`.constants.FrameContainer` to the repository.
+        """Adds the `frame_container` of type :obj:`.FrameContainer` to the repository.
         """
         begin = frame_container.fromTimestamp
         end = frame_container.toTimestamp
@@ -77,8 +85,7 @@ class Repository(object):
             frame_container.write(f)
 
     def open(self, timestamp, cam_id):
-        """
-        Finds and load the :obj:`.constants.FrameContainer` that matches the timestamp and cam_id.
+        """Finds and load the :obj:`.FrameContainer` that matches the `timestamp` and `cam_id`.
         """
         fnames = self.find(timestamp)
         for fname in fnames:
@@ -87,9 +94,10 @@ class Repository(object):
                 return load_frame_container(fname)
 
     def find(self, ts, cam=None):
-        """
-        Returns all files that includes detections to the given timestamp `ts`.
-        TODO: UTC timestamps! Generall
+        """Returns all files that includes detections to the given timestamp `ts`.
+
+        TODO:
+            UTC timestamps! Generall
         """
         dt = to_datetime(ts)
         path = self._path_for_dt(dt)
@@ -106,8 +114,8 @@ class Repository(object):
         return found_files
 
     def iter_fnames(self, begin=None, end=None, cam=None):
-        """
-        Returns a generator that yields filenames in sorted order.
+        """ Returns a generator that yields filenames in sorted order.
+
         From `begin` to `end`.
 
         Args:

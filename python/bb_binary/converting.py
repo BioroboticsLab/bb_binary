@@ -1,14 +1,23 @@
 # -*- coding: utf-8 -*-
 """
-You might use converting functions to generate a :class:`.repository.Repository` from existing data
-or to read a :class:`.repository.Repository` into datastructures to analyse them.
+We provide convenience functions to read a *bb_binary* :class:`.Repository` to NumPy Arrays
+and DataFrames. Or to create a :class:`.Repository` from existing data via Pandas Dataframes.
 
+You might need them if you want to
 
-Convert to Numpy Array or Pandas DataFrame
-------------------------------------------
+    - create *bb_binary* Repositories from existing data (like ground truth data)
+    - take a quick glance at a subset of the data (one that fits into memory)
+    - experiment with new features
 
-To generate NumPy Arrays or Pandas DataFrames we provide a simple convenience function. Here is
-an example how to read all the frames and detection data::
+.. warning::
+    The convenience functions are **not** designed for performance. When working with
+    huge datasets it is recommended to use the :class:`.Repository`.
+
+Convert *bb_binary* to NumPy Array
+----------------------------------
+
+To generate NumPy Arrays or Pandas DataFrames we provide a convenience function. Here is
+an example how to read all the frames and detection data to NumPy::
 
     import numpy as np
     import pandas as pd
@@ -21,7 +30,7 @@ an example how to read all the frames and detection data::
         tmp = convert_frame_to_numpy(frame)
         arr = tmp if arr is None else np.hstack((arr, tmp))
 
-Sometimes we also need fields from the :obj:`.constants.FrameContainer`. You can add those
+Sometimes we also need fields from the :obj:`.FrameContainer`. You can add those
 fields using the `add_cols` argument. This works for every other singular values or lists::
 
     arr = None
@@ -30,7 +39,7 @@ fields using the `add_cols` argument. This works for every other singular values
         arr = tmp if arr is None else np.hstack((arr, tmp))
 
 It is also possible to restrict the output to a set of fields that should be extracted.
-When using the `keys` argument you need to specify `detectionsUnion` as :obj:`.constants.Frame`
+When using the `keys` argument you need to specify `detectionsUnion` as :obj:`.Frame`
 key when you want to extract detections::
 
     arr = None
@@ -41,24 +50,31 @@ key when you want to extract detections::
         tmp = convert_frame_to_numpy(frame, keys=keys + ('detectionsUnion',))
         arr = tmp if arr is None else np.hstack((arr, tmp))
 
-Assuming that we have standard pipeline output with :obj:`.constants.DetectionDP` we have to
-convert list like fields separately when converting from Numpy Array to Pandas DataFrame::
+Convert *bb_binary* to Pandas DataFrame
+----------------------------------------
+
+Usually you could directly create a Pandas DataFrame from a NumPy Array::
+
+    data = pd.DataFrame(arr)
+
+Assuming that we have standard pipeline output with :obj:`.DetectionDP` you have to
+convert list like fields separately (because Pandas has problems with lists in fields)::
 
     list_like_fields = set(['decodedId', 'descriptor'])
     data = pd.DataFrame(arr[list(set(arr.dtype.fields.keys()) - list_like_fields)])
     for field in list_like_fields:
         data[field] = pd.Series([list(list_field) for list_field in arr[field]])
 
-Convert a Repository from a Pandas DataFrame
---------------------------------------------
+Convert a Pandas DataFrame to *bb_binary*
+-----------------------------------------
 
-When you have data from other sources like Ground Truth Data, or you need to generate a
-:class:`.repository.Repository` for testing purposes or feature evaluation you might need this
+When you have data from other sources like ground truth data, or you need to generate a
+:class:`.Repository` for testing purposes or feature evaluation you might need this
 converting function. All the column names in the Pandas DataFrame are matched to field names.
 You have to specify the `detectionUnion` type and also the camera id, because each
-:obj:`.constants.FrameContainer` is specific for a camera.
+:obj:`.FrameContainer` is specific for a camera.
 
-The `frame_offset` is used to generate unique :obj:`.constants.Frame` ids::
+The `frame_offset` is used to generate unique :obj:`.Frame` ids::
 
     from bb_binary import Repository, build_frame_container_from_df
     cam_ids = (0, 2)
@@ -76,8 +92,8 @@ import numpy as np
 import numpy.lib.recfunctions as rf
 import pytz
 import six
-from bb_binary.constants import Frame, FrameContainer, DetectionCVP, DetectionDP, DetectionTruth
-from bb_binary.parsing import to_timestamp
+from .common import Frame, FrameContainer, DetectionCVP, DetectionDP, DetectionTruth
+from .parsing import to_timestamp
 
 
 def build_frame_container(from_ts, to_ts, cam_id,
@@ -85,7 +101,7 @@ def build_frame_container(from_ts, to_ts, cam_id,
                           transformation_matrix=None,
                           data_source_fname=None,
                           video_preview_fname=None):
-    """Builds a :obj:`.constants.FrameContainer`
+    """Builds a :obj:`.FrameContainer`
 
     Args:
         from_ts (int or float): Timestamp of the first frame
@@ -122,18 +138,18 @@ def build_frame_container(from_ts, to_ts, cam_id,
 
 
 def build_frame_container_from_df(dfr, union_type, cam_id, frame_offset=0):
-    """Builds a :obj:`.constants.FrameContainer` from a Pandas DataFrame.
+    """Builds a :obj:`.FrameContainer` from a Pandas DataFrame.
 
     Operates differently from :func:`build_frame_container` because it will be used
     in a different context where we have access to more data.
 
-    Column names are matched to :obj:`.constants.Frame` and `Detection*` attributes.
-    Set additional :obj:`.constants.FrameContainer` attributes like `hiveId` in the return value.
+    Column names are matched to :obj:`.Frame` and `Detection*` attributes.
+    Set additional :obj:`.FrameContainer` attributes like `hiveId` in the return value.
 
     Args:
         dfr (:obj:`pd.DataFrame`): Pandas dataframe with detection data
         union_type (str): the type of detections e.g. `detectionsTruth`
-        cam_id (int): id of camera, also used as :obj:`.constants.FrameContainer` id
+        cam_id (int): id of camera, also used as :obj:`.FrameContainer` id
 
     Keyword Args:
         frame offset (Optional int): offset for unique frame ids
@@ -141,7 +157,7 @@ def build_frame_container_from_df(dfr, union_type, cam_id, frame_offset=0):
     Returns:
         tuple: tuple containing:
 
-            - **frame container** (:obj:`.constants.FrameContainer`): converted data from `dfr`
+            - **frame container** (:obj:`.FrameContainer`): converted data from `dfr`
             - **new offset** (:obj:`int`): number of frames (could be used as `frame_offset`)
      """
     def set_attr_from(obj, src, key):
@@ -242,10 +258,10 @@ def convert_frame_to_numpy(frame, keys=None, add_cols=None):
         The frame id is identified in the array as `frameId` instead of `id`!
 
     Args:
-        frame (Frame): datastructure with frame data from capnp.
+        frame (:obj:`.Frame`): datastructure with frame data from capnp.
 
     Keyword Args:
-        keys (Optional iterable): only these keys are converted to the np array.
+        keys (Optional iterable of str): only these keys are converted to the np array.
         add_cols (Optional dict): additional columns for the np array,
             use either a single value or a sequence of correct length.
 
