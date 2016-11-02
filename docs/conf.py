@@ -25,7 +25,7 @@ def get_modules():
     p = subprocess.Popen(get_imports, cwd=cwd, stdout=subprocess.PIPE)
     stdout, stderr = p.communicate()
     modules = json.loads(stdout.decode('utf-8'))[:-1]
-    modules = [m for m in modules if not m.startswith('bb_binary')]
+    modules = [m for m in modules if not (m.startswith('bb_binary') or m.startswith('.'))]
     mock_modules = []
     for module in modules:
         try:
