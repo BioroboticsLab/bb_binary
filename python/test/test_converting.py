@@ -12,7 +12,7 @@ from bb_binary import Frame
 # converting
 from bb_binary import build_frame_container, build_frame_container_from_df, convert_frame_to_numpy
 from bb_binary.converting import _convert_detections_to_numpy, _convert_frame_to_numpy, \
-        _get_detections
+    _get_detections
 # parsing
 from bb_binary import to_datetime, to_timestamp
 
