@@ -7,6 +7,7 @@ There are also some helper to convert some data representations like timeformats
 """
 import os
 from datetime import datetime
+from bitarray import bitarray
 import numpy as np
 import iso8601
 import pytz
@@ -65,6 +66,33 @@ def int_id_to_binary(int_id, nb_bits=12):
         int_id >>= 1
         pos -= 1
     return result
+
+
+def binary_id_to_int(decoded_id, threshold=0.5, endian='big'):
+    """Helper to convert an id represented as bit array to an integer.
+
+    Warning:
+        :obj:`.DetectionDP` uses little-endian notation for `decodedId`.
+
+    Note:
+        This is a generic solution to the problem. If have to decode a lot of ids take a look on
+        `numpy.packbits()
+        <https://docs.scipy.org/doc/numpy/reference/generated/numpy.packbits.html>`_ and implement a
+        vectorized version.
+
+    Arguments:
+        decoded_id (:obj:`list` of int or float): id as bit array
+
+    Keyword Arguments:
+        threshold (Optional float): `decoded_id` values >= threshold are interpreted as 1
+        endian (Optional str): use either 'big' or 'little', default is 'big'
+
+    Returns:
+        int: the decoded id represented as integer
+    """
+    if endian == 'little':
+        decoded_id = decoded_id[::-1]
+    return int(bitarray([bit >= threshold for bit in decoded_id], endian=endian).to01(), 2)
 
 
 def parse_cam_id(fname):

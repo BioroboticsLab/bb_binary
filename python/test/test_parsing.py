@@ -6,7 +6,8 @@ import numpy as np
 import pytz
 import pytest
 from bb_binary import parse_cam_id, parse_fname, parse_video_fname, parse_image_fname, \
-    dt_to_str, to_datetime, to_timestamp, int_id_to_binary, get_fname, get_video_fname
+    dt_to_str, to_datetime, to_timestamp, int_id_to_binary, binary_id_to_int, \
+    get_fname, get_video_fname
 
 
 def test_dt_to_str():
@@ -65,15 +66,12 @@ def test_to_timestamp():
     assert to_timestamp(dt) == 1439640040
 
 
-def test_int_id_to_binary():
-    """Test conversion of integer id representation to binary array representation."""
-    bit_arr = int_id_to_binary(8)
-    assert np.all(bit_arr == np.array([0, 0, 0, 0, 0, 0,
-                                       0, 0, 1, 0, 0, 0], dtype=np.uint8))
-
-    bit_arr = int_id_to_binary(4095)
-    assert np.all(bit_arr == np.array([1, 1, 1, 1, 1, 1,
-                                       1, 1, 1, 1, 1, 1], dtype=np.uint8))
+@pytest.fixture
+def int_bin_mapping():
+    """Mapping from integer to binary array represenations."""
+    mapping = []
+    mapping.append((8, np.array([0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0], dtype=np.uint8)))
+    mapping.append((4095, np.array([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], dtype=np.uint8)))
 
     beeid_digits = 12
     # test setting of single bits
@@ -81,21 +79,48 @@ def test_int_id_to_binary():
     np.fill_diagonal(expected_result, 1)
     expected_result = np.fliplr(expected_result)
 
-    result = np.zeros_like(expected_result)
     for i in range(0, beeid_digits):
-        result[i] = int_id_to_binary(2**i, nb_bits=beeid_digits)
-
-    assert np.array_equal(result, expected_result)
+        mapping.append((2**i, expected_result[:, i]))
 
     # correct conversion of all integers in range
     for i in range(0, 2**beeid_digits):
-        bit_array = int_id_to_binary(i, nb_bits=beeid_digits)
-        assert beeid_digits == len(bit_array)
-        assert i == sum([m * 2**n for (n, m) in enumerate(bit_array[::-1])])
+        number_bin = bin(i)[2:]
+        number_bin = '0' * (beeid_digits - len(number_bin)) + number_bin
+        bit_array = np.array([1 if bit == '1' else 0 for bit in number_bin], dtype=np.uint8)
+        mapping.append((i, bit_array))
+    return mapping
+
+
+def test_int_id_to_binary(int_bin_mapping):
+    """Test conversion of integer id representation to binary array representation."""
+    for int_repr, bin_repr in int_bin_mapping:
+        assert np.all(int_id_to_binary(int_repr) == bin_repr)
 
     with pytest.raises(Exception) as exception_information:  # to big value
-        bit_arr = int_id_to_binary(8096)
+        int_id_to_binary(8096)
     assert 'overflows' in str(exception_information.value)
+
+
+def test_binary_id_to_int(int_bin_mapping):
+    """Test conversion of binary array representation to interger id."""
+    for int_repr, bin_repr in int_bin_mapping:
+        assert binary_id_to_int(bin_repr) == int_repr
+
+    # test with floats
+    for int_repr, bin_repr in int_bin_mapping:
+        assert binary_id_to_int(bin_repr / 2) == int_repr
+
+    # change endianess
+    for int_repr, bin_repr in int_bin_mapping:
+        bin_repr = bin_repr[::-1]
+        assert binary_id_to_int(bin_repr / 2, endian='little') == int_repr
+
+    # different threshold
+    bit_array = np.arange(0, 1.2, 0.1)
+    assert len(bit_array) == 12
+    assert np.sum(int_id_to_binary(binary_id_to_int(bit_array))) == 12 - 5
+    assert np.sum(int_id_to_binary(binary_id_to_int(bit_array, threshold=0))) == 12
+    assert np.sum(int_id_to_binary(binary_id_to_int(bit_array, threshold=1))) == 2
 
 
 @pytest.fixture(params=['iso', 'beesbook', 'auto_iso', 'auto_bb', 'arbitrary', 'iso_nomilis'])
