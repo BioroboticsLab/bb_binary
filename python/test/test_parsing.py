@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Tests parsing functions to parse information from filenames and to python objects."""
 # pylint:disable=redefined-outer-name
+from __future__ import division
 from datetime import datetime
 import numpy as np
 import pytz
