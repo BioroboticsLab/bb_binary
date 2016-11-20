@@ -14,7 +14,7 @@ bbb = capnp.load(os.path.join(_dirname, 'bb_binary_schema.capnp'))
 FrameContainer = bbb.FrameContainer
 """
 FrameContainer are basically the root of our data container.
-They represent a part of a video that usually consist of 20 minutes.
+They represent a video that in beesbook context usually consist of 5 minutes.
 Each FrameContainer only has the frames of **one** camera.
 
 .. literalinclude:: ../../bb_binary/bb_binary_schema.capnp
@@ -40,7 +40,7 @@ This is a part of a :obj:`FrameContainer` and references the original video file
 DetectionCVP = bbb.DetectionCVP
 """
 This is the format of a detection in the old Computer Vision Pipeline format.
-It got replaced with :obj:`DetectionDP` in the Summer 2015.
+It got replaced with :obj:`DetectionDP` in the Summer 2016.
 
 .. literalinclude:: ../../bb_binary/bb_binary_schema.capnp
     :lines: 8-24
@@ -57,7 +57,7 @@ This is the new format for a detection that replaced :obj:`DetectionCVP`.
 DetectionTruth = bbb.DetectionTruth
 """
 This is the format for manually generated truth data that might be generated via the
-`Editor GUI <https://github.com/BioroboticsLab/bb_analysis/tree/master/system2/editor-gui>`_
+`Editor GUI <https://github.com/BioroboticsLab/bb_analysis/tree/master/system2/editor-gui>`_.
 
 .. literalinclude:: ../../bb_binary/bb_binary_schema.capnp
     :lines: 44-59
