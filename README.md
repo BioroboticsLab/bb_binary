@@ -20,3 +20,16 @@ $ pip install git+https://github.com/BioroboticsLab/bb_binary.git@0.1
 There is also a java interface under `java`. But currently there is no nice way
 to include it into other projects.
 
+
+## Copying the Data
+It is advisable to use rsync instead of scp when copying the data (or a subset) from the servers. Reason for this is that scp copies links are real files while rsync, with correct options, does not.
+
+**Wrong**:
+```
+scp -r /path/to/bb_binary/data .
+```
+
+**Right**:
+```
+rsync -av /path/to/bb_binary/data .
+```
