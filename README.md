@@ -26,10 +26,10 @@ It is advisable to use rsync instead of scp when copying the data (or a subset) 
 
 **Wrong**:
 ```
-scp -r /path/to/bb_binary/data .
+scp -r server_ip_or_name:/path/to/bb_binary/data .
 ```
 
 **Right**:
 ```
-rsync -av /path/to/bb_binary/data .
+rsync -av server_ip_or_name:/path/to/bb_binary/data .
 ```
