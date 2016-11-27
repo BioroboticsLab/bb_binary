@@ -22,7 +22,9 @@ to include it into other projects.
 
 
 ## Copying the Data
-It is advisable to use rsync instead of scp when copying the data (or a subset) from the servers. Reason for this is that scp copies links are real files while rsync, with correct options, does not.
+Don't use scp: It follows the symlinks and as such duplicates some of the files.
+
+Use rsync: Keeps the symlinks as such but leads to broken links where the data-subset is selected, these must be fixed.
 
 **Wrong**:
 ```
@@ -32,4 +34,5 @@ scp -r server_ip_or_name:/path/to/bb_binary/data .
 **Right**:
 ```
 rsync -av server_ip_or_name:/path/to/bb_binary/data .
+find . -type l -! -exec test -e {} \; -print | xargs rm
 ```
