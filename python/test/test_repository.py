@@ -214,6 +214,36 @@ def test_bbb_repo_end_after_last_file(tmpdir):
         assert os.path.isabs(fname)
 
 
+def test_bbb_iter_small_frame_window(tmpdir):
+    """Tests that iter_frame returns frames if time window is small."""
+    repo = Repository(str(tmpdir.join('frames_from_to_small_window')))
+    repo_start = 0
+    nFC = 10
+    span = 1000
+    nFrames = nFC * span
+    repo_end = repo_start + nFrames
+    begin_end_cam_id = [(ts, ts + span, 0)
+                        for ts in range(repo_start, repo_end, span)]
+    for begin, end, cam_id in begin_end_cam_id:
+        fc = build_frame_container(begin, end, cam_id)
+        fc.init('frames', span)
+        for i, tstamp in enumerate(range(begin, end)):
+            frame = fc.frames[i]
+            frame.id = tstamp
+            frame.timestamp = tstamp
+        repo.add(fc)
+
+    begin = 1
+    end = 10
+    fnames = list(repo.iter_frames(begin, end))
+    assert(len(fnames) > 0)
+
+    begin = 1001
+    end = 1011
+    fnames = list(repo.iter_fnames(begin, end))
+    assert(len(fnames) > 0)
+
+
 def test_bbb_repo_iter_fnames_from_to_and_cam(tmpdir):
     repo = Repository(str(tmpdir.join('complex_from_to_and_cam')))
     span = 200

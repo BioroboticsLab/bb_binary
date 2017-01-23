@@ -179,6 +179,7 @@ class Repository(object):
                 first_directory = False
 
             parsed_fname = [self._parse_repo_fname(f) for f in fnames]
+            # c = camId, b = begin, e = end, f = filename
             cam_id_begin_end_fnames = [(c, b, e, f) for (c, b, e), f in zip(parsed_fname, fnames)]
             if cam is not None:
                 cam_id_begin_end_fnames = list(filter(lambda p: p[CAM_IDX] == cam,
@@ -186,7 +187,8 @@ class Repository(object):
 
             cam_id_begin_end_fnames.sort(key=lambda p: p[BEGIN_IDX])
             for cam_idx, begin_ts, end_ts, fname in cam_id_begin_end_fnames:
-                if iter_range.in_interval(begin_ts) or iter_range.in_interval(end_ts):
+                if iter_range.in_interval(begin_ts) or iter_range.in_interval(end_ts) or \
+                   (begin > begin_ts and end < end_ts):
                     yield self._join_with_repo_dir(current_path, fname)
 
             if end_dir == current_path:
