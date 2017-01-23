@@ -200,7 +200,9 @@ class Repository(object):
 
     def iter_frames(self, begin=None, end=None, cam=None):
         """
-        Yields frames in sorted order.
+        Yields frames with their corresponding FrameContainers. The FrameContainers are ordered
+        in time. Beware that individual frames may not be in order if cam is not set.
+
         From `begin` to `end`.
 
         Args:
