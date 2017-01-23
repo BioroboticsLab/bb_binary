@@ -159,12 +159,15 @@ class Repository(object):
         if current_path == self.root_dir:
             return
 
+        end_dir = self._get_latest_path()
+        last_ts = self._get_time_from_path(end_dir)
+
         if end is None:
-            end_dir = self._get_latest_path()
             end = pytz.utc.localize(datetime.max)
         else:
             end = to_datetime(end)
-            end_dir = self._path_for_dt(end, abs=True)
+            if end < last_ts:
+                end_dir = self._path_for_dt(end, abs=True)
 
         iter_range = TimeInterval(begin, end)
         first_directory = True

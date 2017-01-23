@@ -200,6 +200,20 @@ def test_bbb_repo_iter_fnames_from_to(tmpdir):
     assert fbasenames == expected_fnames
 
 
+def test_bbb_repo_end_after_last_file(tmpdir):
+    repo = Repository(str(tmpdir.join('complex_from_to')))
+    span = 1500
+    begin_end_cam_id = [(ts, ts + span, 0)
+                        for ts in range(0, 10000, span)]
+
+    fill_repository(repo, begin_end_cam_id)
+    begin = 2500
+    end = 11000
+    fnames = list(repo.iter_fnames(begin, end))
+    for fname in fnames:
+        assert os.path.isabs(fname)
+
+
 def test_bbb_repo_iter_fnames_from_to_and_cam(tmpdir):
     repo = Repository(str(tmpdir.join('complex_from_to_and_cam')))
     span = 200
