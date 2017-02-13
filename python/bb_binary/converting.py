@@ -319,6 +319,8 @@ def _convert_frame_to_numpy(frame, keys=None):
 
     fields = [getattr(frame, key) for key in keys]
     formats = [type(field) for field in fields]
+    if 'id' in keys:
+        formats[keys.index('id')] = np.uint64
 
     # create frame
     frame_arr = np.array(tuple(fields),
