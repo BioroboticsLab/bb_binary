@@ -26,10 +26,10 @@ struct DetectionCVP {
 struct DetectionDP {
   idx @0 :UInt16;                # sequential index of the detection, counted from 0 for every frame
                                  # the combination (idx, Frame.id) is a global key
-  xpos @1 :UInt16;               # x coordinate of the grid center wrt. the image
-  ypos @2 :UInt16;               # y coordinate of the grid center wrt. the image
-  xposHive @3 :UInt16;           # x coordinate of the grid center wrt. the hive
-  yposHive @4 :UInt16;           # y coordinate of the grid center wrt. the hive
+  ypos @1 :UInt16;               # y coordinate of the grid center wrt. the image
+  xpos @2 :UInt16;               # x coordinate of the grid center wrt. the image
+  yposHive @3 :UInt16;           # y coordinate of the grid center wrt. the hive
+  xposHive @4 :UInt16;           # x coordinate of the grid center wrt. the hive
   zRotation @5 :Float32;         # rotation of the grid in z plane
   yRotation @6 :Float32;         # rotation of the grid in y plane
   xRotation @7 :Float32;         # rotation of the grid in x plane
@@ -44,10 +44,10 @@ struct DetectionDP {
 struct DetectionTruth {
   idx @0 :UInt16;                # sequential index of the detection, counted from 0 for every frame
                                  # the combination (idx, Frame.id) is a global key
-  xpos @1 :UInt16;               # x coordinate of the grid center wrt. the image
-  ypos @2 :UInt16;               # y coordinate of the grid center wrt. the image
-  xposHive @3 :UInt16;           # x coordinate of the grid center wrt. the hive
-  yposHive @4 :UInt16;           # y coordinate of the grid center wrt. the hive
+  ypos @1 :UInt16;               # y coordinate of the grid center wrt. the image
+  xpos @2 :UInt16;               # x coordinate of the grid center wrt. the image
+  yposHive @3 :UInt16;           # y coordinate of the grid center wrt. the hive
+  xposHive @4 :UInt16;           # x coordinate of the grid center wrt. the hive
   decodedId @5 :Int32;           # decoded id by human
   readability @6 :Grade;         # tags might be visible or (partially) obscured
   enum Grade {                   # ranks for evaluation of a tag's readability are:
