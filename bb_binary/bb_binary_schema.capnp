@@ -36,7 +36,11 @@ struct DetectionDP {
   radius @8 :Float32;            # radius of the tag
   localizerSaliency @9 :Float32; # saliency of the localizer network
   decodedId @10 :List(UInt8);    # the decoded id, the bit probabilities are discretised to 0-255.
-                                 # p(first bit == 1) = decodedId[0] / 255
+                                 # p(first bit == 1) = decodedId[0] / 255. bits are in most significant 
+                                 # bit first order starting at the 1 o'clock position on the tag in 
+                                 # clockwise orientation.
+                                 # see https://arxiv.org/pdf/1611.01331.pdf Figure 1(a) for a graphical
+                                 # representation
   descriptor @11 :List(UInt8);   # visual descriptor of the detection. ordered from most
                                  # significant eight bits to least significant eight bits.
 }
