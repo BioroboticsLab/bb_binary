@@ -113,7 +113,7 @@ class Repository(object):
                 found_files.append(self._join_with_repo_dir(path, fname))
         return found_files
 
-    def iter_fnames(self, begin=None, end=None, cam=None):
+    def iter_fnames(self, begin=None, end=None, cam=None, fname_filter=None):
         """ Returns a generator that yields filenames in sorted order.
 
         From `begin` to `end`.
@@ -126,6 +126,8 @@ class Repository(object):
                 frame with a timestamp smaller then `end`.
                 If not set, it will continue until the last file.
             cam (Optional int): Only yield filenames with this cam id.
+            fname_filter (Optional function): only yield fnames for which the function
+                returns true
 
         Example:
 
@@ -189,6 +191,8 @@ class Repository(object):
             for cam_idx, begin_ts, end_ts, fname in cam_id_begin_end_fnames:
                 if iter_range.in_interval(begin_ts) or iter_range.in_interval(end_ts) or \
                    (begin > begin_ts and end < end_ts):
+                    if fname_filter is not None and fname_filter(fname) is False:
+                        continue
                     yield self._join_with_repo_dir(current_path, fname)
 
             if end_dir == current_path:
@@ -198,7 +202,7 @@ class Repository(object):
                     current_path, direction='forward')
                 current_path = self._join_with_repo_dir(current_path)
 
-    def iter_frames(self, begin=None, end=None, cam=None):
+    def iter_frames(self, begin=None, end=None, cam=None, frame_filter=None):
         """
         Yields frames with their corresponding FrameContainers. The FrameContainers are ordered
         in time. Beware that individual frames may not be in order if cam is not set.
@@ -211,6 +215,8 @@ class Repository(object):
             end (Optional timestamp): select frames with timestamp < end.
             Ends with biggest timestamp in repository if not set.
             cam (Optional int): only yield filenames with this cam id.
+            frame_filter (Optional function): only yield frames for which the function
+                returns true
 
         Returns:
             (tuple): tuple containing:
@@ -221,6 +227,8 @@ class Repository(object):
         for f in self.iter_fnames(begin=begin, end=end, cam=cam):
             fc = load_frame_container(f)
             for frame in fc.frames:
+                if frame_filter is not None and frame_filter(frame) is False:
+                    continue
                 if ((begin is None or begin <= frame.timestamp) and
                    (end is None or frame.timestamp < end)):
                     # it seems to be more efficient to yield a FrameContainer
