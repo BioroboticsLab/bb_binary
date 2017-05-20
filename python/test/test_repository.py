@@ -4,6 +4,7 @@
 import os
 import math
 from datetime import datetime
+import numpy as np
 import pytz
 from conftest import fill_repository
 # constants
@@ -268,6 +269,72 @@ def test_bbb_repo_iter_fnames_from_to_and_cam(tmpdir):
         os.path.basename(repo._get_filename(*p, extension='bbb'))
         for p in slice_begin_end_cam_id]
     assert fbasenames == expected_fnames
+
+
+def test_bbb_repo_iter_frames_filtered(tmpdir):
+    repo = Repository(str(tmpdir.join('frames_from_to_filtered')))
+    repo_start = 0
+    nFC = 10
+    span = 1000
+    nFrames = nFC * span
+    repo_end = repo_start + nFrames
+    begin_end_cam_id = [(ts, ts + span, 0)
+                        for ts in range(repo_start, repo_end, span)]
+    for begin, end, cam_id in begin_end_cam_id:
+        fc = build_frame_container(begin, end, cam_id)
+        fc.init('frames', span)
+        for i, tstamp in enumerate(range(begin, end)):
+            frame = fc.frames[i]
+            frame.id = tstamp
+            frame.timestamp = tstamp
+        repo.add(fc)
+
+    timestamps = [f[0].timestamp for f in repo.iter_frames(begin, end)]
+    selected_timestamps = set(np.random.choice(timestamps, size=5, replace=False))
+
+    class TimestepFilter():
+        def __init__(self, timesteps):
+            self.timesteps = timesteps
+
+        def __call__(self, frame):
+            return frame.timestamp in self.timesteps
+
+    filtered_frames = list(repo.iter_frames(begin, end,
+                                            frame_filter=TimestepFilter(selected_timestamps)))
+    filtered_timestamps = set([f[0].timestamp for f in filtered_frames])
+
+    assert(filtered_timestamps == selected_timestamps)
+
+
+def test_bbb_repo_iter_fnames_filtered(tmpdir):
+    repo = Repository(str(tmpdir.join('complex_from_to_and_cam')))
+    span = 200
+    begin_end_cam_id0 = [(ts, ts + span, 0) for ts in range(0, 10000, span)]
+    begin_end_cam_id1 = [(ts, ts + span, 1) for ts in range(0, 10000, span)]
+
+    begin_end_cam_id = begin_end_cam_id0 + begin_end_cam_id1
+
+    fill_repository(repo, begin_end_cam_id)
+    begin = 2500
+    end = 5000
+    cam = 0
+    fnames = list(repo.iter_fnames(begin, end, cam))
+
+    selected_fnames = np.random.choice(fnames, size=5, replace=False)
+    selected_fnames = set([os.path.basename(f) for f in selected_fnames])
+
+    class FnameFilter():
+        def __init__(self, fnames):
+            self.fnames = fnames
+
+        def __call__(self, fname):
+            return fname in self.fnames
+
+    filtered_fnames = set(repo.iter_fnames(begin, end, cam,
+                                           fname_filter=FnameFilter(selected_fnames)))
+    filtered_fnames = set([os.path.basename(f) for f in filtered_fnames])
+
+    assert(filtered_fnames == selected_fnames)
 
 
 def test_bbb_repo_find_multiple_file_per_timestamp(tmpdir):
