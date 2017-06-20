@@ -12,7 +12,7 @@ bb_binary contains the capnproto schema of the BeesBooks detections and the
 To install the python interface simply run:
 
 ```
-$ pip install git+https://github.com/BioroboticsLab/bb_binary.git@0.1
+$ pip install git+https://github.com/BioroboticsLab/bb_binary.git
 ```
 
 ## Java  Interface
