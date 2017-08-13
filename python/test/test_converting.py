@@ -2,25 +2,22 @@
 """Tests convenience functions to convert bb_binary data to structured NumPy Arrays."""
 # pylint:disable=redefined-outer-name
 from datetime import datetime
+
 import numpy as np
 import pandas as pd
-from pandas.util.testing import assert_frame_equal
+import pandas as pdut
 import pytest
 import pytz
-# constants
-from bb_binary import Frame
-# converting
-from bb_binary import build_frame_container, build_frame_container_from_df, convert_frame_to_numpy
-from bb_binary.converting import _convert_detections_to_numpy, _convert_frame_to_numpy, \
-    _get_detections
-# parsing
-from bb_binary import to_datetime, to_timestamp
+
+import bb_binary as bbb
+import bb_binary.converting as bbb_c
+
 
 
 @pytest.fixture
 def frame_data():
     """Frame without detections."""
-    frame = Frame.new_message()
+    frame = bbb.Frame.new_message()
     frame.id = 1
     frame.dataSourceIdx = 1
     frame.timedelta = 150
@@ -137,29 +134,29 @@ def make_df_from_np(np_arr, union_type):
 def test_bbb_build_frame_container():
     """Tests the generation of a ``FrameContainer`` via function."""
     # very simple case
-    fco = build_frame_container(0, 1, 0)
+    fco = bbb.build_frame_container(0, 1, 0)
     assert fco.camId == 0
     assert fco.fromTimestamp == 0
     assert fco.toTimestamp == 1
 
-    ts1 = to_timestamp(datetime(1970, 1, 1, tzinfo=pytz.utc))
-    ts2 = to_timestamp(datetime(2015, 8, 15, 12, 0, 40, tzinfo=pytz.utc))
+    ts1 = bbb.to_timestamp(datetime(1970, 1, 1, tzinfo=pytz.utc))
+    ts2 = bbb.to_timestamp(datetime(2015, 8, 15, 12, 0, 40, tzinfo=pytz.utc))
 
     # more advanced
-    fco = build_frame_container(ts1, ts2, 1)
+    fco = bbb.build_frame_container(ts1, ts2, 1)
     assert fco.camId == 1
     assert fco.fromTimestamp == ts1
     assert fco.toTimestamp == ts2
 
     # try to set every parameter
-    fco = build_frame_container(ts1, ts2, 1, hive_id=5, data_source_fname="testname")
+    fco = bbb.build_frame_container(ts1, ts2, 1, hive_id=5, data_source_fname="testname")
     assert fco.hiveId == 5
     assert len(fco.dataSources) == 1
     assert fco.dataSources[0].filename == "testname"
     assert fco.dataSources[0].videoPreviewFilename == ""
 
     # filename and video are both strings
-    fco = build_frame_container(ts1, ts2, 1, data_source_fname="testname",
+    fco = bbb.build_frame_container(ts1, ts2, 1, data_source_fname="testname",
                                 video_preview_fname="test_video_name")
     assert len(fco.dataSources) == 1
     assert fco.dataSources[0].filename == "testname"
@@ -168,7 +165,7 @@ def test_bbb_build_frame_container():
     # try combination of filenames and preview names
     fnames = ["testname", "testname 1"]
     vnames = ["test_video_name", "test_video_name 1"]
-    fco = build_frame_container(ts1, ts2, 1, data_source_fname=fnames, video_preview_fname=vnames)
+    fco = bbb.build_frame_container(ts1, ts2, 1, data_source_fname=fnames, video_preview_fname=vnames)
     assert len(fco.dataSources) == 2
     assert fco.dataSources[0].filename == "testname"
     assert fco.dataSources[0].videoPreviewFilename == "test_video_name"
@@ -181,11 +178,11 @@ def test_bbb_frame_container_errors(frame_data_all):
     frame = frame_data_all
     expected_keys = ('timestamp', 'xpos', 'ypos', 'detectionsUnion')
 
-    arr = convert_frame_to_numpy(frame, keys=expected_keys)
+    arr = bbb.convert_frame_to_numpy(frame, keys=expected_keys)
     bbb_check_frame_data(frame, arr, expected_keys)
     detections = pd.DataFrame(arr)
     with pytest.raises(AssertionError) as error_information:
-        build_frame_container_from_df(detections, frame.detectionsUnion.which(), 0)
+        bbb.build_frame_container_from_df(detections, frame.detectionsUnion.which(), 0)
     assert 'decodedId' in str(error_information.value)
 
 
@@ -196,7 +193,7 @@ def test_bbb_fc_from_df(frame_data_all):
     expected_keys = ['timestamp', ]
     expected_keys.extend(get_detection_keys(union_type))
 
-    arr = convert_frame_to_numpy(frame, expected_keys)
+    arr = bbb.convert_frame_to_numpy(frame, expected_keys)
     bbb_check_frame_data(frame, arr, expected_keys)
     detections = make_df_from_np(arr, union_type)
     expected_detections = detections.copy()
@@ -205,7 +202,7 @@ def test_bbb_fc_from_df(frame_data_all):
     offset = 0
     # test minimal set
     dfr = detections.copy()
-    fco, offset = build_frame_container_from_df(dfr, union_type, offset)
+    fco, offset = bbb.build_frame_container_from_df(dfr, union_type, offset)
     assert offset == 1
     assert fco.id == 0
     assert fco.camId == 0
@@ -219,15 +216,15 @@ def test_bbb_fc_from_df(frame_data_all):
     assert frame0.timestamp == expected_detections.timestamp[0]
     assert len(getattr(frame0.detectionsUnion, union_type)) == 4
 
-    arr = convert_frame_to_numpy(frame0, expected_keys)
+    arr = bbb.convert_frame_to_numpy(frame0, expected_keys)
     converted_detections = make_df_from_np(arr, union_type)
-    assert_frame_equal(expected_detections, converted_detections)
+    pdut.assert_frame_equal(expected_detections, converted_detections)
 
     # test without readability
     dfr = detections.copy()
     if union_type == 'detectionsTruth':
         dfr.drop('readability', axis=1, inplace=True)
-    fco, offset = build_frame_container_from_df(dfr, union_type, offset, frame_offset=offset)
+    fco, offset = bbb.build_frame_container_from_df(dfr, union_type, offset, frame_offset=offset)
     assert offset == 2  # test offset and id to test for fixed assignments
     assert fco.id == 1
     assert fco.camId == 1
@@ -243,8 +240,8 @@ def test_bbb_fc_from_df(frame_data_all):
 
     # test with datetime instead of unixtimestamp
     dfr = detections.copy()
-    dfr.timestamp = dfr.timestamp.apply(to_datetime)
-    fco, offset = build_frame_container_from_df(dfr, union_type, offset, frame_offset=offset)
+    dfr.timestamp = dfr.timestamp.apply(bbb.to_datetime)
+    fco, offset = bbb.build_frame_container_from_df(dfr, union_type, offset, frame_offset=offset)
     assert offset == 3
     assert fco.fromTimestamp == expected_detections.timestamp[0]
     assert len(fco.frames) == 1
@@ -252,7 +249,7 @@ def test_bbb_fc_from_df(frame_data_all):
     # test with additional column for frames
     dfr = detections.copy()
     dfr['dataSourceIdx'] = 99
-    fco, offset = build_frame_container_from_df(dfr, union_type, offset, frame_offset=offset)
+    fco, offset = bbb.build_frame_container_from_df(dfr, union_type, offset, frame_offset=offset)
     assert offset == 4
     assert len(fco.frames) == 1
 
@@ -262,7 +259,7 @@ def test_bbb_fc_from_df(frame_data_all):
     # test with additional column for detections
     dfr = detections.copy()
     dfr['xposHive'] = range(0, n_detections)
-    fco, offset = build_frame_container_from_df(dfr, union_type, offset, frame_offset=offset)
+    fco, offset = bbb.build_frame_container_from_df(dfr, union_type, offset, frame_offset=offset)
     assert offset == 5
     assert len(fco.frames) == 1
 
@@ -274,7 +271,7 @@ def test_bbb_fc_from_df(frame_data_all):
     dfr = detections.copy()
     dfr['camId'] = [offset] * dfr.shape[0]
     dfr.loc[0, 'camId'] = offset - 1
-    fco, offset = build_frame_container_from_df(dfr, union_type, offset, frame_offset=offset)
+    fco, offset = bbb.build_frame_container_from_df(dfr, union_type, offset, frame_offset=offset)
     assert offset == 6
     assert len(fco.frames) == 1
 
@@ -287,12 +284,12 @@ def test_bbb_convert_detections(frame_data_all):
     frame = frame_data_all
     expected_keys = get_detection_keys(frame.detectionsUnion.which())
 
-    detections = _get_detections(frame)
-    arr = _convert_detections_to_numpy(detections, keys=expected_keys)
+    detections = bbb_c._get_detections(frame)
+    arr = bbb_c._convert_detections_to_numpy(detections, keys=expected_keys)
     bbb_check_frame_data(frame, arr, expected_keys)
 
     # now compare behaviour of helper and parent function
-    arr_frame = convert_frame_to_numpy(frame, keys=expected_keys)
+    arr_frame = bbb.convert_frame_to_numpy(frame, keys=expected_keys)
     assert np.all(arr == arr_frame)
 
 
@@ -302,11 +299,11 @@ def test_bbb_convert_only_frame(frame_data_all):
 
     expected_keys = ('frameId', 'timedelta', 'timestamp', 'detectionsUnion')
 
-    arr = _convert_frame_to_numpy(frame, keys=expected_keys)
+    arr = bbb_c._convert_frame_to_numpy(frame, keys=expected_keys)
     bbb_check_frame_data(frame, arr, expected_keys)
 
     # now compare behaviour of helper and parent function
-    arr_frame = convert_frame_to_numpy(frame, keys=expected_keys)
+    arr_frame = bbb.convert_frame_to_numpy(frame, keys=expected_keys)
     assert np.all(arr == arr_frame)
 
 
@@ -317,7 +314,7 @@ def test_bbb_convert_frame_det(frame_data_all):
     expected_keys = ['frameId', 'timedelta', 'timestamp']
     expected_keys.extend(get_detection_keys(frame.detectionsUnion.which()))
 
-    arr = convert_frame_to_numpy(frame, keys=expected_keys)
+    arr = bbb.convert_frame_to_numpy(frame, keys=expected_keys)
     bbb_check_frame_data(frame, arr, expected_keys)
 
 
@@ -328,25 +325,25 @@ def test_bbb_convert_frame_add_cols(frame_data_all):
     expected_keys = ('frameId', 'timedelta', 'timestamp', 'decodedId', 'detectionsUnion')
 
     # one col, single value for whole columns
-    arr = convert_frame_to_numpy(frame, keys=expected_keys, add_cols={'camId': 2})
+    arr = bbb.convert_frame_to_numpy(frame, keys=expected_keys, add_cols={'camId': 2})
     assert 'camId' in arr.dtype.names
     assert np.all(arr['camId'] == 2)
 
     # two cols, single value
-    arr = convert_frame_to_numpy(frame, keys=expected_keys, add_cols={'camId': 2, 'second': 3})
+    arr = bbb.convert_frame_to_numpy(frame, keys=expected_keys, add_cols={'camId': 2, 'second': 3})
     assert 'camId' in arr.dtype.names
     assert 'second' in arr.dtype.names
     assert np.all(arr['camId'] == 2)
     assert np.all(arr['second'] == 3)
 
     # list for whole column
-    arr = convert_frame_to_numpy(frame, keys=expected_keys, add_cols={'camId': range(0, 4)})
+    arr = bbb.convert_frame_to_numpy(frame, keys=expected_keys, add_cols={'camId': range(0, 4)})
     assert 'camId' in arr.dtype.names
     assert np.all(arr['camId'] == np.array(range(0, 4)))
 
     # existing column
     with pytest.raises(AssertionError):
-        arr = convert_frame_to_numpy(frame, keys=expected_keys, add_cols={'frameId': 9})
+        arr = bbb.convert_frame_to_numpy(frame, keys=expected_keys, add_cols={'frameId': 9})
 
 
 def test_bbb_convert_frame_default(frame_data_all):
@@ -358,7 +355,7 @@ def test_bbb_convert_frame_default(frame_data_all):
     expected_keys = frame_keys | detection_keys | set(['camId'])
 
     # extract frame without explicitly asking for keys
-    arr = convert_frame_to_numpy(frame, add_cols={'camId': 0})
+    arr = bbb.convert_frame_to_numpy(frame, add_cols={'camId': 0})
     bbb_check_frame_data(frame, arr, expected_keys)
 
 
@@ -370,7 +367,7 @@ def bbb_check_frame_data(frame, arr, expected_keys):
     assert len(expected_keys) == len(arr.dtype.names)
 
     detection_string_fields = ('readability')
-    detections = _get_detections(frame)
+    detections = bbb_c._get_detections(frame)
     for i, detection in enumerate(detections):
         # check if the values are as expected
         for key in expected_keys:
@@ -398,13 +395,13 @@ def bbb_check_frame_data(frame, arr, expected_keys):
 def test_bbb_get_detections(frame_data, frame_dp_data, frame_cvp_data, frame_truth_data):
     """Extracts correct detections from old and new pipeline data."""
     diffKey = 'candidateIdx'
-    detections = _get_detections(frame_dp_data)
+    detections = bbb_c._get_detections(frame_dp_data)
     assert not hasattr(detections[0], diffKey)
 
-    detections = _get_detections(frame_cvp_data)
+    detections = bbb_c._get_detections(frame_cvp_data)
     assert hasattr(detections[0], diffKey)
 
-    detections = _get_detections(frame_truth_data)
+    detections = bbb_c._get_detections(frame_truth_data)
     assert hasattr(detections[0], 'readability')
 
     # Important note: the default value for detectionsUnion is detectionsCVP
