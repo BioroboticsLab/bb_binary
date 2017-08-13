@@ -37,6 +37,12 @@ This is a part of a :obj:`FrameContainer` and references the original video file
     :lines: 76-80
 """
 
+HiveMappingData = bbb.HiveMappingData
+# TODO(gitmirgut): Add docs
+
+HiveMappedDetection = bbb.HiveMappedDetection
+# TODO(gitmirgut): Add docs
+
 DetectionCVP = bbb.DetectionCVP
 """
 This is the format of a detection in the old Computer Vision Pipeline format.
