@@ -13,7 +13,6 @@ import bb_binary as bbb
 import bb_binary.converting as bbb_c
 
 
-
 @pytest.fixture
 def frame_data():
     """Frame without detections."""
