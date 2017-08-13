@@ -96,10 +96,7 @@ from .common import Frame, FrameContainer, DetectionCVP, DetectionDP, DetectionT
 from .parsing import to_timestamp
 
 
-def build_frame_container(from_ts, to_ts, cam_id,
-                          hive_id=None,
-                          transformation_matrix=None,
-                          data_source_fname=None,
+def build_frame_container(from_ts, to_ts, cam_id, hive_id=None, data_source_fname=None,
                           video_preview_fname=None):
     """Builds a :obj:`.FrameContainer`
 
@@ -132,8 +129,6 @@ def build_frame_container(from_ts, to_ts, cam_id,
                 data_sources[i].videoPreviewFilename = video_preview_fname[i]
     if hive_id is not None:
         fco.hiveId = hive_id
-    if transformation_matrix is not None:
-        fco.transformationMatrix = transformation_matrix
     return fco
 
 

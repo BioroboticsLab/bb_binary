@@ -152,11 +152,8 @@ def test_bbb_build_frame_container():
     assert fco.toTimestamp == ts2
 
     # try to set every parameter
-    tfm = [1./3, 2.5, 4]
-    fco = build_frame_container(ts1, ts2, 1, hive_id=5, transformation_matrix=tfm,
-                                data_source_fname="testname")
+    fco = build_frame_container(ts1, ts2, 1, hive_id=5, data_source_fname="testname")
     assert fco.hiveId == 5
-    assert np.all(np.isclose(fco.transformationMatrix, tfm))
     assert len(fco.dataSources) == 1
     assert fco.dataSources[0].filename == "testname"
     assert fco.dataSources[0].videoPreviewFilename == ""
