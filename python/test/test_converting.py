@@ -156,7 +156,7 @@ def test_bbb_build_frame_container():
 
     # filename and video are both strings
     fco = bbb.build_frame_container(ts1, ts2, 1, data_source_fname="testname",
-                                video_preview_fname="test_video_name")
+                                    video_preview_fname="test_video_name")
     assert len(fco.dataSources) == 1
     assert fco.dataSources[0].filename == "testname"
     assert fco.dataSources[0].videoPreviewFilename == "test_video_name"
@@ -164,7 +164,8 @@ def test_bbb_build_frame_container():
     # try combination of filenames and preview names
     fnames = ["testname", "testname 1"]
     vnames = ["test_video_name", "test_video_name 1"]
-    fco = bbb.build_frame_container(ts1, ts2, 1, data_source_fname=fnames, video_preview_fname=vnames)
+    fco = bbb.build_frame_container(ts1, ts2, 1, data_source_fname=fnames,
+                                    video_preview_fname=vnames)
     assert len(fco.dataSources) == 2
     assert fco.dataSources[0].filename == "testname"
     assert fco.dataSources[0].videoPreviewFilename == "test_video_name"
