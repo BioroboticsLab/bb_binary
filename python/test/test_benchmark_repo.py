@@ -61,8 +61,6 @@ def build_frame(
        * ``idx``
        * ``xpos``
        * ``ypos``
-       * ``xposHive``
-       * ``yposHive``
        * ``zRotation``
        * ``yRotation``
        * ``xRotation``
@@ -94,12 +92,10 @@ def build_frame(
         detec_builder[i].idx = int(detection[0])
         detec_builder[i].xpos = int(detection[1])
         detec_builder[i].ypos = int(detection[2])
-        detec_builder[i].xposHive = int(detection[3])
-        detec_builder[i].yposHive = int(detection[4])
-        detec_builder[i].zRotation = float(detection[5])
-        detec_builder[i].yRotation = float(detection[6])
-        detec_builder[i].xRotation = float(detection[7])
-        detec_builder[i].radius = float(detection[8])
+        detec_builder[i].zRotation = float(detection[3])
+        detec_builder[i].yRotation = float(detection[4])
+        detec_builder[i].xRotation = float(detection[5])
+        detec_builder[i].radius = float(detection[6])
 
         nb_ids = len(detection) - _detection_dp_fields_before_ids
         decodedId = detec_builder[i].init('decodedId', nb_ids)

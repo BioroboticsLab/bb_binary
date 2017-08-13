@@ -181,7 +181,7 @@ def build_frame_container_from_df(dfr, union_type, cam_id, frame_offset=0):
     }[union_type]
 
     # check that we have all the information we need
-    skip_keys = frozenset(['readability', 'xposHive', 'yposHive', 'frameIdx', 'idx'])
+    skip_keys = frozenset(['readability', 'frameIdx', 'idx'])
     minimal_keys = set(detection.to_dict().keys()) - skip_keys
     list_keys = set()
     # for some reasons lists are not considered when using to_dict()!

@@ -96,7 +96,7 @@ def frame_data_all(request, frame_cvp_data, frame_dp_data, frame_truth_data):
 
 def get_detection_keys(union_type):
     """Function holding union type specific detection keys."""
-    keys = ['idx', 'xpos', 'ypos', 'xposHive', 'yposHive', 'decodedId', 'detectionsUnion']
+    keys = ['idx', 'xpos', 'ypos', 'decodedId', 'detectionsUnion']
 
     additional_keys = {
         'detectionsDP': ['xRotation', 'yRotation', 'zRotation',
@@ -258,14 +258,9 @@ def test_bbb_fc_from_df(frame_data_all):
 
     # test with additional column for detections
     dfr = detections.copy()
-    dfr['xposHive'] = range(0, n_detections)
     fco, offset = bbb.build_frame_container_from_df(dfr, union_type, offset, frame_offset=offset)
     assert offset == 5
     assert len(fco.frames) == 1
-
-    converted_detections = getattr(fco.frames[0].detectionsUnion, union_type)
-    for i in range(0, n_detections):
-        assert converted_detections[i].xposHive == dfr.xposHive[i]
 
     # test with camId column
     dfr = detections.copy()
