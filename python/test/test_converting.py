@@ -5,7 +5,7 @@ from datetime import datetime
 
 import numpy as np
 import pandas as pd
-import pandas as pdut
+import pandas.util.testing as pdut
 import pytest
 import pytz
 
