@@ -19,10 +19,10 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-@0xc5f1af96651f70ea;
+@0xbd967913c26602f6;
 
-annotation package @0x9ee4c8f803b3b596 (file) : Text;
+annotation package @0xb47ecd44d5e322f1 (file) : Text;
 # Name of the package, such as "org.example.foo", in which the generated code will reside.
 
-annotation outerClassname @0x9b066bb4881f7cd3 (file) : Text;
+annotation outerClassname @0xa668f4cbe5e45dee (file) : Text;
 # Name of the outer class that will wrap the generated code.
