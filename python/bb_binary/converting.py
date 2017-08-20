@@ -339,6 +339,7 @@ def _convert_detections_to_numpy(detections, keys=None):
     # automatically deduce keys and types except for decodedId
     detection0 = detections[0].to_dict()
     detection_keys = set(detection0.keys())
+    detection_keys.discard('hiveMappedDetection')
     if keys is None:
         keys = list(detection_keys)
     else:
