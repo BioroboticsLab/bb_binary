@@ -266,11 +266,12 @@ def convert_frame_to_numpy(frame, keys=None, add_cols=None):
     """
     ret_arr = None
 
+    frame_arr = _convert_frame_to_numpy(frame, keys)
+
     if keys is None or 'detectionsUnion' in keys:
         detections = _get_detections(frame)
         ret_arr = _convert_detections_to_numpy(detections, keys)
 
-    frame_arr = _convert_frame_to_numpy(frame, keys)
     if ret_arr is not None and frame_arr is not None:
         frame_arr = np.repeat(frame_arr, ret_arr.shape[0], axis=0)
         ret_arr = rf.merge_arrays((frame_arr, ret_arr),
