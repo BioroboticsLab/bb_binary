@@ -1,18 +1,20 @@
 # -*- coding: utf-8 -*-
 """Tests the Repository class that allows reading and writing to bb_binary data stores."""
 # pylint:disable=redefined-outer-name
-import os
-import math
 from datetime import datetime
+import math
+import os
+
 import numpy as np
 import pytz
-from conftest import fill_repository
-# constants
-from bb_binary import Frame
+
 # converting
 from bb_binary import build_frame_container
+# constants
+from bb_binary import Frame
 # repository
 from bb_binary import Repository
+from conftest import fill_repository
 
 
 def test_bbb_is_loaded():

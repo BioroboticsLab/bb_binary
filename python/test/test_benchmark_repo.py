@@ -1,15 +1,16 @@
 # -*- coding: utf-8 -*-
 #
-from conftest import fill_repository
-from bb_binary import build_frame_container, Repository
-
-import time
-import numpy as np
-import pytest
 import os
 import random
-import tempfile
 import shutil
+import tempfile
+import time
+
+import numpy as np
+import pytest
+
+from bb_binary import build_frame_container, Repository
+from conftest import fill_repository
 
 
 @pytest.fixture

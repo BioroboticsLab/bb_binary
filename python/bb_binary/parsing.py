@@ -5,11 +5,12 @@ This submodule contains a collection of helper to parse filenames and some field
 
 There are also some helper to convert some data representations like timeformats or ids.
 """
-import os
 from datetime import datetime
+import os
+
 from bitarray import bitarray
-import numpy as np
 import iso8601
+import numpy as np
 import pytz
 
 _TIMEZONE = pytz.timezone('Europe/Berlin')

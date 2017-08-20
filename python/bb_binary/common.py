@@ -4,6 +4,7 @@ These objects are providing access to our :doc:`schema` in
 `Python's Cap'n Proto implementation <http://jparyani.github.io/pycapnp/>`_.
 """
 import os
+
 import capnp
 
 capnp.remove_import_hook()

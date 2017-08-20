@@ -1,5 +1,6 @@
 """Setup for tests and fixtures."""
 import warnings
+
 import pandas as pd
 
 # enable stack trace for annoying SettingWithCopyWarning

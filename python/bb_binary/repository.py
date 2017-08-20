@@ -9,11 +9,12 @@ time. A :class:`.Repository` manages these *bb_binary* datafiles and provides me
 This class provides performant access to a *bb_binary* data store but you will have to parse
 the data by yourself. You might use some helpers from :doc:`parsing`.
 """
-import os
+from datetime import datetime, timedelta
 import errno
 import json
 import math
-from datetime import datetime, timedelta
+import os
+
 import pytz
 import six
 

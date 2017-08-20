@@ -88,10 +88,12 @@ Function Documentation
 """
 # pylint:disable=no-member
 from datetime import datetime
+
 import numpy as np
 import numpy.lib.recfunctions as rf
 import pytz
 import six
+
 from .common import Frame, FrameContainer, DetectionCVP, DetectionDP, DetectionTruth
 from .parsing import to_timestamp
 
