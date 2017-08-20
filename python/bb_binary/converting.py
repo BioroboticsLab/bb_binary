@@ -109,7 +109,6 @@ def build_frame_container(from_ts, to_ts, cam_id, hive_id=None, data_source_fnam
 
     Keyword Args:
         hive_id (Optional int): id of the hive
-        transformation_matrix (Optional iterable with floats): Transformation matrix for coordinates
         data_source_fname (Optional str or list of str): Filename(s) of the data source(s).
         video_preview_fname (Optional str or list of str): Filename(s) of preview videos.
             Have to allign to `data_source_fname`!
