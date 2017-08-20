@@ -6,10 +6,10 @@ $Java.outerClassname("BeesBook");
 
 
 struct HiveMappedDetection {
-  xpos @0 :Float32;               # x coordinate of the grid center wrt. the hive
-  ypos @1 :Float32;               # y coordinate of the grid center wrt. the hive
-  zRotation @2 :Float32;          # rotation of the grid in z plane wrt. the hive
-  radius @3 :Float32;             # radius of the tag
+  xposHive @0 :Float32;               # x coordinate of the grid center wrt. the hive
+  yposHive @1 :Float32;               # y coordinate of the grid center wrt. the hive
+  zRotationHive @2 :Float32;          # rotation of the grid in z plane wrt. the hive
+  radiusHive @3 :Float32;             # radius of the tag
 }
 
 struct DetectionCVP {
