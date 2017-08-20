@@ -18,8 +18,8 @@ import os
 import pytz
 import six
 
-from .common import FrameContainer, CAM_IDX, BEGIN_IDX
-from .parsing import get_video_fname, to_datetime, parse_cam_id, parse_video_fname, \
+from bb_binary.common import FrameContainer, CAM_IDX, BEGIN_IDX
+from bb_binary.parsing import get_video_fname, to_datetime, parse_cam_id, parse_video_fname, \
     parse_image_fname_iso
 
 

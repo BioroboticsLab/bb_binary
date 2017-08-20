@@ -94,8 +94,8 @@ import numpy.lib.recfunctions as rf
 import pytz
 import six
 
-from .common import Frame, FrameContainer, DetectionCVP, DetectionDP, DetectionTruth
-from .parsing import to_timestamp
+from bb_binary.common import Frame, FrameContainer, DetectionCVP, DetectionDP, DetectionTruth
+from bb_binary.parsing import to_timestamp
 
 
 def build_frame_container(from_ts, to_ts, cam_id, hive_id=None, data_source_fname=None,
