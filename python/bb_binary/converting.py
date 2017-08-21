@@ -299,6 +299,10 @@ def _convert_frame_to_numpy(frame, keys=None):
 
     Converts the frame data to a numpy array.
     """
+    # if a tuple has just one element it will be interpret as string
+    # this will fix it.
+    if type(keys) == str:
+        keys = (keys, )
     # automatically deduce keys and types from frame
     frame_keys = set(frame.to_dict().keys())
     frame_keys.discard('detectionsUnion')
