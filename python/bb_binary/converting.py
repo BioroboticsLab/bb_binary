@@ -337,45 +337,74 @@ def _convert_detections_to_numpy(detections, keys=None):
     """
     nrows = len(detections)
 
-    # automatically deduce keys and types except for decodedId
-    detection0 = detections[0].to_dict()
-    detection_keys = set(detection0.keys())
+    # Get potential keys of detectionsUnion, but without the 'level' hiveMappedDetection
+    detection_dict = detections[0].to_dict()
+    detection_keys = set(detection_dict.keys())
     detection_keys.discard('hiveMappedDetection')
+
+    # extract selected keys
+    keys_lvl_detection = []
     if keys is None:
-        keys = list(detection_keys)
+        keys_lvl_detection = list(detection_keys)
     else:
-        keys = list(set(keys) & detection_keys)
+        keys_lvl_detection = list(set(keys) & detection_keys)
+
+    # Get potential keys of hiveMappedDetection
+    hivedata_dict = detections[0].hiveMappedDetection.to_dict()
+    hivedata_keys = set(hivedata_dict.keys())
+
+    # extract selected keys
+    keys_lvl_hivedata = []
+    if keys is None or 'hiveMappedDetection' in keys:
+        if keys is None:
+            keys_lvl_hivedata = list(hivedata_keys)
+        else:
+            keys_lvl_hivedata = list(set(keys) & hivedata_keys)
 
     # abort if no information should be extracted
-    if len(keys) == 0:
+    if len(keys_lvl_hivedata) == 0 and len(keys_lvl_detection) == 0:
         return None
 
-    formats = [type(detection0[key]) for key in keys]
+    # get formats of the numpy fields
+    formats_lvl_det = [type(detection_dict[key]) for key in keys_lvl_detection]
 
     readability_key = 'readability'
     decoded_id_key = 'decodedId'
     decoded_id_index = None
     descriptor_key = 'descriptor'
     descriptor_index = None
-    if decoded_id_key in keys and isinstance(detection0[decoded_id_key], list):
+
+    if decoded_id_key in keys_lvl_detection and isinstance(detection_dict[decoded_id_key], list):
         # special handling of decodedId as float array in DP pipeline data
-        decoded_id_index = keys.index(decoded_id_key)
-        formats[decoded_id_index] = str(len(detection0[decoded_id_key])) + 'f8'
-    elif readability_key in keys:
+        decoded_id_index = keys_lvl_detection.index(decoded_id_key)
+        formats_lvl_det[decoded_id_index] = str(len(detection_dict[decoded_id_key])) + 'f8'
+    elif readability_key in keys_lvl_detection:
         # special handling of enum because numpy does not determine str length
-        readbility_index = keys.index(readability_key)
-        formats[readbility_index] = 'S10'
-    if descriptor_key in keys and isinstance(detection0[descriptor_key], list):
+        readbility_index = keys_lvl_detection.index(readability_key)
+        formats_lvl_det[readbility_index] = 'S10'
+    if descriptor_key in keys_lvl_detection and isinstance(detection_dict[descriptor_key], list):
         # special handling of descriptor as uint8 array in DP pipeline data
-        descriptor_index = keys.index(descriptor_key)
-        formats[descriptor_index] = str(len(detection0[descriptor_key])) + 'u8'
-    detection_arr = np.empty(nrows, dtype={'names': keys, 'formats': formats})
+        descriptor_index = keys_lvl_detection.index(descriptor_key)
+        formats_lvl_det[descriptor_index] = str(len(detection_dict[descriptor_key])) + 'u8'
+
+    # concat formats of detection and hivedata
+    formats = formats_lvl_det + [type(hivedata_dict[key]) for key in keys_lvl_hivedata]
+    names = keys_lvl_detection + keys_lvl_hivedata
+
+    # allocate numpy array
+    detection_arr = np.empty(nrows, dtype={'names': names, 'formats': formats})
+
+    # fill allocated numpy array
     for i, detection in enumerate(detections):
         # make sure we have the same order as in keys
-        val = [getattr(detection, key) for key in keys]
+        val_lvl_detection = [getattr(detection, key) for key in keys_lvl_detection]
+        val_lvl_hivedata = [getattr(detection.hiveMappedDetection, key)
+                            for key in keys_lvl_hivedata]
         if decoded_id_index is not None:
-            val[decoded_id_index] = np.array(val[decoded_id_index]) / 255.
+            val_lvl_detection[decoded_id_index] = np.array(
+                val_lvl_detection[decoded_id_index]) / 255.
         # structured np arrays only accept tuples
+        val = val_lvl_detection + val_lvl_hivedata
         detection_arr[i] = tuple(val)
 
     return detection_arr

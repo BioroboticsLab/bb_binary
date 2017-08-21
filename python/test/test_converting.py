@@ -38,6 +38,10 @@ def frame_dp_data(frame_data):
         detection.zRotation = 0.24 + 0.1 * i
         detection.yRotation = 0.1 + 0.1 * i
         detection.xRotation = -0.14 - 0.1 * i
+        detection.hiveMappedDetection.xposHive = 23 + 10 * i
+        detection.hiveMappedDetection.yposHive = 54 + 10 * i
+        detection.hiveMappedDetection.zRotationHive = 0.23 + 0.1 * i
+        detection.hiveMappedDetection.radiusHive = 1.1 + i
         detection.radius = 22 + i
         detection.localizerSaliency = 0.8765
         nb_bits = 12
@@ -347,7 +351,9 @@ def test_bbb_convert_frame_default(frame_data_all):
 
     frame_keys = set(['frameId', 'dataSourceIdx', 'frameIdx', 'timestamp', 'timedelta'])
     detection_keys = set(get_detection_keys(frame.detectionsUnion.which()))
-    expected_keys = frame_keys | detection_keys | set(['camId'])
+    hivedata_keys = set(['hiveMappedDetection', 'xposHive', 'yposHive',
+                         'zRotationHive', 'radiusHive'])
+    expected_keys = frame_keys | detection_keys | hivedata_keys | set(['camId'])
 
     # extract frame without explicitly asking for keys
     arr = bbb.convert_frame_to_numpy(frame, add_cols={'camId': 0})
@@ -357,7 +363,7 @@ def test_bbb_convert_frame_default(frame_data_all):
 def bbb_check_frame_data(frame, arr, expected_keys):
     """Helper to compare frame data to numpy array."""
     # check if we have all the expected keys in the array (and only these)
-    expected_keys = set(expected_keys) - set(['detectionsUnion'])
+    expected_keys = set(expected_keys) - set(['detectionsUnion']) - set(['hiveMappedDetection'])
     assert expected_keys == set(arr.dtype.names)
     assert len(expected_keys) == len(arr.dtype.names)
 
@@ -383,6 +389,8 @@ def bbb_check_frame_data(frame, arr, expected_keys):
                 assert np.all(arr[key] == getattr(frame, key))
             elif key in detection_string_fields:
                 assert arr[key][i].decode('UTF-8') == getattr(detection, key)
+            elif key in ['xposHive', 'yposHive', 'zRotationHive', 'radiusHive']:
+                assert arr[key][i] == getattr(detection.hiveMappedDetection, key)
             else:
                 assert arr[key][i] == getattr(detection, key)
 
