@@ -19,7 +19,7 @@ They represent a video that in beesbook context usually consist of 5 minutes.
 Each FrameContainer only has the frames of **one** camera.
 
 .. literalinclude:: ../../bb_binary/bb_binary_schema.capnp
-    :lines: 82-98
+    :lines: 159-169
 """
 
 Frame = bbb.Frame
@@ -27,7 +27,7 @@ Frame = bbb.Frame
 A Frame holds all the information about a single image in a video.
 
 .. literalinclude:: ../../bb_binary/bb_binary_schema.capnp
-    :lines: 62-74
+    :lines: 123-135
 """
 
 DataSource = bbb.DataSource
@@ -35,14 +35,24 @@ DataSource = bbb.DataSource
 This is a part of a :obj:`FrameContainer` and references the original video file.
 
 .. literalinclude:: ../../bb_binary/bb_binary_schema.capnp
-    :lines: 76-80
+    :lines: 137-141
 """
 
 HiveMappingData = bbb.HiveMappingData
-# TODO(gitmirgut): Add docs
+"""
+This is the format for the data/parameters used to map detections to hive.
+
+.. literalinclude:: ../../bb_binary/bb_binary_schema.capnp
+    :lines: 62-67
+"""
 
 HiveMappedDetection = bbb.HiveMappedDetection
-# TODO(gitmirgut): Add docs
+"""
+This is the format for a detection with respect to the entire side of hive
+
+.. literalinclude:: ../../bb_binary/bb_binary_schema.capnp
+    :lines: 62-67
+"""
 
 DetectionCVP = bbb.DetectionCVP
 """
@@ -50,7 +60,7 @@ This is the format of a detection in the old Computer Vision Pipeline format.
 It got replaced with :obj:`DetectionDP` in the Summer 2016.
 
 .. literalinclude:: ../../bb_binary/bb_binary_schema.capnp
-    :lines: 8-24
+    :lines: 69-84
 """
 
 DetectionDP = bbb.DetectionDP
@@ -58,7 +68,7 @@ DetectionDP = bbb.DetectionDP
 This is the new format for a detection that replaced :obj:`DetectionCVP`.
 
 .. literalinclude:: ../../bb_binary/bb_binary_schema.capnp
-    :lines: 26-42
+    :lines: 86-105
 """
 
 DetectionTruth = bbb.DetectionTruth
@@ -67,7 +77,7 @@ This is the format for manually generated truth data that might be generated via
 `Editor GUI <https://github.com/BioroboticsLab/bb_analysis/tree/master/system2/editor-gui>`_.
 
 .. literalinclude:: ../../bb_binary/bb_binary_schema.capnp
-    :lines: 44-59
+    :lines: 107-121
 """
 
 CAM_IDX = 0
