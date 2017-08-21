@@ -105,7 +105,8 @@ import numpy.lib.recfunctions as rf
 import pytz
 import six
 
-from bb_binary.common import Frame, FrameContainer, DetectionCVP, DetectionDP, DetectionTruth
+from bb_binary.common import Frame, FrameContainer, DetectionCVP, DetectionDP, DetectionTruth,\
+    HiveMappedDetection
 from bb_binary.parsing import to_timestamp
 
 
@@ -192,8 +193,10 @@ def build_frame_container_from_df(dfr, union_type, cam_id, frame_offset=0):
         'detectionsTruth': DetectionTruth.new_message()
     }[union_type]
 
+    hive_detection = HiveMappedDetection.new_message()
+
     # check that we have all the information we need
-    skip_keys = frozenset(['readability', 'frameIdx', 'idx'])
+    skip_keys = frozenset(['readability', 'frameIdx', 'idx', 'hiveMappedDetection'])
     minimal_keys = set(detection.to_dict().keys()) - skip_keys
     list_keys = set()
     # for some reasons lists are not considered when using to_dict()!
@@ -237,6 +240,8 @@ def build_frame_container_from_df(dfr, union_type, cam_id, frame_offset=0):
 
     detection_fields = [field for field in available_keys if hasattr(detection, field)]
 
+    hive_detection_fields = [field for field in available_keys if hasattr(hive_detection, field)]
+
     # create frames (each timestamp maps to a frame)
     for frame_idx, (_, detections) in enumerate(dfr.groupby(by='timestamp')):
         frame = fco.frames[frame_idx]
@@ -254,6 +259,8 @@ def build_frame_container_from_df(dfr, union_type, cam_id, frame_offset=0):
             detection.idx = detection_idx
             for key in detection_fields:
                 set_attr_from(detection, row, key)
+            for key in hive_detection_fields:
+                set_attr_from(detection.hiveMappedDetection, row, key)
 
     return fco, new_frame_offset
 
