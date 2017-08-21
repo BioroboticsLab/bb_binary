@@ -50,6 +50,17 @@ key when you want to extract detections::
         tmp = convert_frame_to_numpy(frame, keys=keys + ('detectionsUnion',))
         arr = tmp if arr is None else np.hstack((arr, tmp))
 
+Same for hiveMappedDetection. You need to specify `detectionsUnion` and `hiveMappedDetection`
+as :obj:`.Frame` key when you want to extract hiveMappedDetections ::
+
+    arr = None
+    frame_keys = ('frameId', 'frameIdx', 'timedelta', 'timestamp', 'dataSourceIdx')
+    hive_mapped_detection_keys = ('xposHive', 'yposHive')
+    keys = frame_keys + hive_mapped_detection_keys
+    for frame, fc in repo.iter_frames():
+        tmp = convert_frame_to_numpy(frame, keys=keys + ('detectionsUnion', 'hiveMappedDetection'))
+        arr = tmp if arr is None else np.hstack((arr, tmp))
+
 Convert *bb_binary* to Pandas DataFrame
 ----------------------------------------
 
