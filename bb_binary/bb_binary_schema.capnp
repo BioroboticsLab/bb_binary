@@ -4,6 +4,60 @@ using Java = import "java.capnp";
 $Java.package("de.fuberlin.biorobotics");
 $Java.outerClassname("BeesBook");
 
+#
+# DetectionDP.(x|y)pos
+#
+#   0------x----->
+#   |
+#   |   0===========+
+#   y   |           |
+#   |   |   Frame   |
+#   |   |           |
+#   v   +===========+
+#
+# DetectionDP.(z|y|x)Rotation
+# Rotational direction is from x to y
+#
+# (Axes)
+#                      x
+#             *-----------------------------> (right border)
+#            / \
+#           /   \  0==================/
+#          /     \/     Frame        /
+#         /      /\                 /
+#    y   /      /  ° z             /
+#       /      /                  /
+#      /      /==================/
+#     /              \
+#    v                v
+# (lower border)
+#
+# HiveMappedDetection.(x|y)posHive
+#
+#   0------x----->
+#   |
+#   |   0===========+
+#   y   |           |
+#   |   |   Hive    |
+#   |   |           |
+#   v   +===========+
+#
+# HiveMappedDetection.zRotationHive
+# Rotational direction is from x to y
+#
+# (Axes)
+#                      x
+#             *-----------------------------> (right border)
+#            / \
+#           /   \  0==================/
+#          /     \/     Hive         /
+#         /      /\                 /
+#    y   /      /  ° z             /
+#       /      /                  /
+#      /      /==================/
+#     /              \
+#    v                v
+# (lower border)
 
 struct HiveMappedDetection {
   xposHive @0 :Float32;               # x coordinate of the grid center wrt. the hive
