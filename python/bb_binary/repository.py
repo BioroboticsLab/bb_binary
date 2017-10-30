@@ -35,7 +35,7 @@ def _mkdir_p(path):
 def load_frame_container(fname):
     """Loads :obj:`.FrameContainer` from this filename."""
     with open(fname, 'rb') as f:
-        return FrameContainer.read(f)
+        return FrameContainer.read(f, traversal_limit_in_words=2**63)
 
 
 class Repository(object):
