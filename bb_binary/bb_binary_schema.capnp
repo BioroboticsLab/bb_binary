@@ -36,8 +36,8 @@ struct DetectionDP {
   radius @8 :Float32;            # radius of the tag
   localizerSaliency @9 :Float32; # saliency of the localizer network
   decodedId @10 :List(UInt8);    # the decoded id, the bit probabilities are discretised to 0-255.
-                                 # p(first bit == 1) = decodedId[0] / 255. bits are in most significant 
-                                 # bit first order starting at the 1 o'clock position on the tag in 
+                                 # p(first bit == 1) = decodedId[0] / 255. bits are in most significant
+                                 # bit first order starting at the 1 o'clock position on the tag in
                                  # clockwise orientation.
                                  # see https://arxiv.org/pdf/1611.01331.pdf Figure 1(a) for a graphical
                                  # representation
@@ -63,6 +63,15 @@ struct DetectionTruth {
 }
 
 
+struct DetectionBee {
+  idx @0 :UInt16;                # sequential index of the detection, counted from 0 for every frame
+                                 # the combination (idx, Frame.id) is a global key
+  ypos @1 :UInt16;               # y coordinate of the grid center wrt. the image
+  xpos @2 :UInt16;               # x coordinate of the grid center wrt. the image
+  localizerSaliency @3 :Float32; # saliency of the localizer network
+}
+
+
 # Corresponds to an image in the video.
 struct Frame {
   id @0 :UInt64;                 # global unique id of the frame
@@ -75,6 +84,7 @@ struct Frame {
     detectionsDP    @5 :List(DetectionDP);    # detections format of the new deeppipeline
     detectionsTruth @7 :List(DetectionTruth); # detections format of ground truth data
   }
+  detectionsBees @8: List(DetectionBee); # detections of untagged bees
 }
 
 struct DataSource {
