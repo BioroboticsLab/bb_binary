@@ -1,1 +1,0 @@
-../../bb_binary/java.capnp

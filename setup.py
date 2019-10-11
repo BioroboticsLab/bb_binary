@@ -13,7 +13,7 @@ dep_links = [str(req_line.url) for req_line in install_reqs]
 
 setup(
     name='bb_binary',
-    version='0.1',
+    version='2.0',
     description='BeesBook Binary',
     author='Leon Sixt',
     author_email='mail@leon-sixt.de',

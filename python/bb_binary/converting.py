@@ -92,7 +92,7 @@ import numpy as np
 import numpy.lib.recfunctions as rf
 import pytz
 import six
-from .common import Frame, FrameContainer, DetectionCVP, DetectionDP, DetectionTruth
+from .common import Frame, FrameContainer, DetectionDP, DetectionTruth
 from .parsing import to_timestamp
 
 
@@ -180,7 +180,6 @@ def build_frame_container_from_df(dfr, union_type, cam_id, frame_offset=0):
             new_list[i] = val
 
     detection = {
-        'detectionsCVP': DetectionCVP.new_message(),
         'detectionsDP': DetectionDP.new_message(),
         'detectionsTruth': DetectionTruth.new_message()
     }[union_type]
@@ -384,12 +383,10 @@ def _convert_detections_to_numpy(detections, keys=None):
 
 
 def _get_detections(frame):
-    """Extracts detections of DP, CVP or truth data from frame."""
+    """Extracts detections of DP or truth data from frame."""
     union_type = frame.detectionsUnion.which()
     if union_type == 'detectionsDP':
         detections = frame.detectionsUnion.detectionsDP
-    elif union_type == 'detectionsCVP':
-        detections = frame.detectionsUnion.detectionsCVP
     elif union_type == 'detectionsTruth':
         detections = frame.detectionsUnion.detectionsTruth
     else:
