@@ -43,23 +43,24 @@ struct DetectionBee {
   ypos @1 :UInt16;               # y coordinate of the grid center wrt. the image
   xpos @2 :UInt16;               # x coordinate of the grid center wrt. the image
   localizerSaliency @3 :Float32; # saliency of the localizer network
+  type @4: Type;                 # type of detection
+  enum Type {
+    untagged @0;                 #  - bee has no tag
+    inCell @1;                   #  - thorax is in cell and may not have a tag
+    upsideDown @2;               #  - bee is walking on the glass and may not have a tag
+  }
 }
 
 
 # Corresponds to an image in the video.
 struct Frame {
-  id @0 :UInt64;                 # global unique id of the frame
-  dataSourceIdx @1:UInt32;       # the frame is from this data source
-  frameIdx @2 :UInt32;           # sequential increasing index for every data source.
-  timestamp @3 :Float64;         # unix time stamp of the frame
-  timedelta @4 :UInt32;          # time difference between this frame and the frame before in microseconds
-  detectionsUnion : union {
-    detectionsDP    @5 :List(DetectionDP);    # detections format of the new deeppipeline
-    detectionsTruth @6 :List(DetectionTruth); # detections format of ground truth data
-  }
-  detectionsUntaggedBees @7: List(DetectionBee); # detections of untagged bees
-  detectionsInCelldBees @8: List(DetectionBee); # detections of bees in cells
-  detectionsUpsideDownBees @9: List(DetectionBee); # detections of upside down bees
+  id @0 :UInt64;                            # global unique id of the frame
+  dataSourceIdx @1:UInt32;                  # the frame is from this data source
+  frameIdx @2 :UInt32;                      # sequential increasing index for every data source.
+  timestamp @3 :Float64;                    # unix time stamp of the frame
+  detectionsDP @4 :List(DetectionDP);       # detections format of the new deeppipeline
+  detectionsBees @5: List(DetectionBee);    # detections of bees with no or no visible tag
+  detectionsTruth @6 :List(DetectionTruth); # detections format of ground truth data
 }
 
 struct DataSource {

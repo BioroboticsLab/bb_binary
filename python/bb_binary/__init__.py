@@ -12,7 +12,7 @@ from .parsing import dt_to_str, get_fname, get_video_fname, get_timezone, \
 
 # TODO: Add warning about windows symlinks
 
-__all__ = ['Frame', 'FrameContainer', 'DataSource', 'DetectionDP', 'DetectionTruth', 'Detection',
+__all__ = ['Frame', 'FrameContainer', 'DataSource', 'DetectionDP', 'DetectionTruth', 'DetectionBee',
            'convert_frame_to_numpy', 'build_frame_container', 'build_frame_container_from_df',
            'load_frame_container', 'Repository',
            'dt_to_str', 'get_fname', 'get_video_fname', 'get_timezone',
