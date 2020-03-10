@@ -357,7 +357,8 @@ class Repository(object):
             link_dir = os.path.dirname(link_fname)
             _mkdir_p(link_dir)
             rel_goal = os.path.relpath(fname, start=link_dir)
-            os.symlink(rel_goal, link_fname)
+            if not os.path.islink(link_fname):
+                os.symlink(rel_goal, link_fname)
             iter_path = self._step_one_directory(iter_ts, 'backward')
             iter_ts = self._get_time_from_path(iter_path)
         return fname, symlinks
