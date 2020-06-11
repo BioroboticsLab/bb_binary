@@ -161,15 +161,13 @@ class Repository(object):
         if current_path == self.root_dir:
             return
 
-        end_dir = self._get_latest_path()
-        last_ts = self._get_time_from_path(end_dir)
-
+        last_timestamp = self._get_time_from_path(self._get_latest_path())
         if end is None:
             end = pytz.utc.localize(datetime.max)
         else:
             end = to_datetime(end)
-            if end < last_ts:
-                end_dir = self._path_for_dt(end, abs=True)
+            if end < last_timestamp:
+                last_timestamp = end
 
         iter_range = TimeInterval(begin, end)
         first_directory = True
@@ -195,7 +193,8 @@ class Repository(object):
                         continue
                     yield self._join_with_repo_dir(current_path, fname)
 
-            if end_dir == current_path:
+            current_timestamp = self._get_time_from_path(current_path)
+            if current_timestamp >= last_timestamp:
                 break
             else:
                 current_path = self._step_to_next_directory(
