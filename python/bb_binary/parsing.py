@@ -11,6 +11,7 @@ from bitarray import bitarray
 import numpy as np
 import iso8601
 import pytz
+import re
 
 _TIMEZONE = pytz.timezone('Europe/Berlin')
 
@@ -152,12 +153,38 @@ def parse_image_fname_iso(fname):
 
     return camIdx, dt
 
+def parse_image_fname_basler(fname):
+    basename = os.path.basename(fname)
+    name_splitted = basename.split('.')
+
+    def parse_name(name):
+        camIdxStr, date_str = name.split('_')
+        dt = iso8601.parse_date(basler_to_iso_format(date_str))
+        return int(camIdxStr.replace('cam-', '')), dt
+
+    try:
+        name = '.'.join(name_splitted[:2])
+        camIdx, dt = parse_name(name)
+    except iso8601.ParseError:
+        name = name_splitted[0]
+        camIdx, dt = parse_name(name)
+
+    return camIdx, dt
+
+def basler_to_iso_format(date_str):
+    # Add colons and dashes to match ISO 8601 format and handle fractional seconds correctly
+    date_str = re.sub(r'(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})\.(\d+)\.(\d+)', r'\1-\2-\3T\4:\5:\6.\7Z', date_str)
+    # Ensure there is only one 'Z' at the end
+    date_str = re.sub(r'Z+', 'Z', date_str)
+    return date_str
 
 def parse_image_fname(fname, format='auto'):
     if format == 'beesbook':
         return parse_image_fname_beesbook(fname)
     elif format == 'iso':
         return parse_image_fname_iso(fname)
+    elif format == 'basler':
+        return  parse_image_fname_basler(fname)
     elif format == 'auto':
         basename = os.path.basename(fname)
         if basename.count('_') >= 3:
@@ -181,17 +208,34 @@ def parse_video_fname(fname, format='auto'):
         start, end = isotimespan.split('--')
         end = end.rstrip(".bbb")
         return int(camIdx), iso8601.parse_date(start), iso8601.parse_date(end)
+    
+    def basler_parse():
+        name, _ = os.path.splitext(basename)
+        camIdx, isotimespan = name.split('_')
+        start, end = isotimespan.split('--')
+        
+        # Correct the date format
+        start = basler_to_iso_format(start)
+        end = basler_to_iso_format(end)
+        
+        return int(camIdx.replace('cam-', '')), iso8601.parse_date(start), iso8601.parse_date(end)
+
 
     basename = os.path.basename(fname)
     if format == 'beesbook':
         return beesbook_parse()
     elif format == 'iso':
         return iso_parse()
+    elif format == 'basler':
+        return basler_parse()
     elif format == 'auto':
         try:
             return beesbook_parse()
         except ValueError:
-            return iso_parse()
+            try:
+                return iso_parse()
+            except ValueError:
+                return basler_parse()
     else:
         raise ValueError("Unknown format {}.".format(format))
 
