@@ -187,13 +187,18 @@ def parse_image_fname(fname, format='auto'):
         return  parse_image_fname_basler(fname)
     elif format == 'auto':
         basename = os.path.basename(fname)
-        if basename.count('_') >= 3:
+        # Detect the 'basler' format: it starts with 'cam-'
+        if basename.startswith('cam-'):
+            return parse_image_fname_basler(fname)
+        # If the filename contains 3 or more underscores, assume 'beesbook' format
+        elif basename.count('_') >= 3:
             return parse_image_fname_beesbook(fname)
+        # Try ISO format as a fallback
         else:
-            return parse_image_fname_iso(fname)
-    else:
-        raise Exception("Unknown format {}.".format(format))
-
+            try:
+                return parse_image_fname_iso(fname)
+            except ValueError:
+                raise ValueError(f"Filename '{fname}' does not match any known format (basler, iso, beesbook).")
 
 def parse_video_fname(fname, format='auto'):
     def beesbook_parse():
