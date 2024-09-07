@@ -18,7 +18,7 @@ _TIMEZONE = pytz.timezone('Europe/Berlin')
 
 def dt_to_str(dt):
     dt = to_datetime(dt)
-    isoformat = "%Y-%m-%dT%H:%M:%S"
+    isoformat = "%Y-%m-%dT%H_%M_%S"
 
     dt_str = dt.strftime(isoformat)
     if dt.microsecond != 0:
