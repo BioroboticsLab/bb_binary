@@ -214,7 +214,7 @@ def parse_video_fname(fname, format='auto'):
         end = end.rstrip(".bbb")
         return int(camIdx), iso8601.parse_date(start), iso8601.parse_date(end)
     
-    def bbb_parse(basename):
+    def bbb_parse():
         name, _ = os.path.splitext(basename)        
         _, camIdx, isotimespan = name.split('_', 2)
         start, end = isotimespan.split('--')
