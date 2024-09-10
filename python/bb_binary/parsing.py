@@ -207,12 +207,20 @@ def parse_video_fname(fname, format='auto'):
         (_, end) = parse_image_fname(end_name, 'beesbook')
         return camIdx, begin, end
 
-    def iso_parse():
+    def iso_parse(): # was previously used for .bbb files
         name, _ = os.path.splitext(basename)
         _, camIdx, isotimespan = name.split('_')
         start, end = isotimespan.split('--')
         end = end.rstrip(".bbb")
         return int(camIdx), iso8601.parse_date(start), iso8601.parse_date(end)
+    
+    def bbb_parse(basename):
+        name, _ = os.path.splitext(basename)        
+        _, camIdx, isotimespan = name.split('_', 2)
+        start, end = isotimespan.split('--')
+        start = start.replace('_', ':')  # to convert to iso format
+        end = end.rstrip(".bbb").replace('_', ':')
+        return int(camIdx), iso8601.parse_date(start), iso8601.parse_date(end)    
     
     def basler_parse():
         name, _ = os.path.splitext(basename)
@@ -229,6 +237,8 @@ def parse_video_fname(fname, format='auto'):
     basename = os.path.basename(fname)
     if format == 'beesbook':
         return beesbook_parse()
+    elif format == 'bbb':
+        return bbb_parse()
     elif format == 'iso':
         return iso_parse()
     elif format == 'basler':
@@ -238,9 +248,12 @@ def parse_video_fname(fname, format='auto'):
             return beesbook_parse()
         except ValueError:
             try:
-                return iso_parse()
+                return bbb_parse()
             except ValueError:
-                return basler_parse()
+                try:
+                    return iso_parse()
+                except ValueError:
+                    return basler_parse()
     else:
         raise ValueError("Unknown format {}.".format(format))
 

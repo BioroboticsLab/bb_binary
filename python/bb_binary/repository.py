@@ -384,7 +384,7 @@ class Repository(object):
     @staticmethod
     def _parse_repo_fname(fname):
         try:
-            return parse_video_fname(fname, format='iso')
+            return parse_video_fname(fname, format='bbb')
         except:
             return parse_image_fname_iso(fname)
 
