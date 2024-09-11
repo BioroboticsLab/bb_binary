@@ -173,7 +173,10 @@ def parse_image_fname_basler(fname):
 
 def basler_to_iso_format(date_str):
     # Add colons and dashes to match ISO 8601 format and handle fractional seconds correctly
-    date_str = re.sub(r'(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})\.(\d+)\.(\d+)', r'\1-\2-\3T\4:\5:\6.\7Z', date_str)
+    # fractional seconds should have 6 digits in ISO format.  pad to the left with a zero if there are only 5 digits
+    date_str = re.sub(r'(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})\.(\d+)\.(\d+)', 
+                      lambda m: f"{m.group(1)}-{m.group(2)}-{m.group(3)}T{m.group(4)}:{m.group(5)}:{m.group(6)}.{m.group(7).zfill(6)}Z", 
+                      date_str)
     # Ensure there is only one 'Z' at the end
     date_str = re.sub(r'Z+', 'Z', date_str)
     return date_str
