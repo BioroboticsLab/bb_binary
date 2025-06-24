@@ -1,4 +1,4 @@
-bitarray>=0.8.1
+bitarray
 numpy>=1.10.2
 pandas>=0.17.1
 pytz>=2016.0
