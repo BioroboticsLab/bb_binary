@@ -357,7 +357,14 @@ class Repository(object):
             _mkdir_p(link_dir)
             rel_goal = os.path.relpath(fname, start=link_dir)
             if not os.path.islink(link_fname):
-                os.symlink(rel_goal, link_fname)
+                try:
+                    os.symlink(rel_goal, link_fname)
+                except OSError as e:
+                    # Some backends (e.g., object stores, rclone/sshfs mounts) do not support symlinks.
+                    if e.errno in (errno.EOPNOTSUPP, errno.EPERM, errno.EINVAL):
+                        print(f"[warn] symlink not supported: {rel_goal} -> {link_fname} ({e})")
+                    else:
+                        raise
             iter_path = self._step_one_directory(iter_ts, 'backward')
             iter_ts = self._get_time_from_path(iter_path)
         return fname, symlinks
